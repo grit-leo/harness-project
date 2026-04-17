@@ -1,0 +1,66 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e8]
+        - generic [ref=e10]:
+          - heading "Lumina" [level=1] [ref=e11]
+          - paragraph [ref=e12]: Intelligent Bookmark Library
+      - generic [ref=e13]:
+        - link "GitHub" [ref=e14] [cursor=pointer]:
+          - /url: https://github.com
+        - link "Collections" [ref=e15] [cursor=pointer]:
+          - /url: /collections
+        - button "Add bookmark" [ref=e16]
+        - button "Log out" [ref=e17]
+  - generic [ref=e20]:
+    - generic [ref=e21]:
+      - generic [ref=e22]:
+        - generic:
+          - img
+        - textbox "Search bookmarks or tags..." [ref=e23]
+      - generic [ref=e24]:
+        - generic [ref=e25]: 2 / 2
+        - button "Clear all" [disabled] [ref=e26]
+    - generic [ref=e28]:
+      - button "ai" [ref=e29]
+      - button "demo-tag" [ref=e30]
+      - button "github" [ref=e31]
+      - button "machine-learning" [ref=e32]
+      - button "research" [ref=e33]
+  - main [ref=e34]:
+    - generic [ref=e35]:
+      - article [ref=e36]:
+        - link "Test Article example.com" [ref=e37] [cursor=pointer]:
+          - /url: https://example.com/test-article
+          - generic [ref=e38]:
+            - heading "Test Article" [level=3] [ref=e39]
+            - paragraph [ref=e40]: example.com
+        - paragraph [ref=e41]: An in-depth article about emerging technology trends and software development practices.
+        - button "demo-tag" [ref=e43]
+        - generic [ref=e44]:
+          - generic [ref=e45]: 8h ago
+          - generic [ref=e46]:
+            - button "Edit" [ref=e47]:
+              - img [ref=e48]
+            - button "Delete" [ref=e50]:
+              - img [ref=e51]
+      - article [ref=e54]:
+        - link "AI Research Paper github.com" [ref=e55] [cursor=pointer]:
+          - /url: https://github.com/ai-research/paper
+          - generic [ref=e56]:
+            - heading "AI Research Paper" [level=3] [ref=e57]
+            - paragraph [ref=e58]: github.com
+        - paragraph [ref=e59]: A comprehensive paper exploring neural networks and their applications in modern AI systems.
+        - generic [ref=e60]:
+          - button "research" [ref=e61]
+          - button "ai" [ref=e62]
+        - generic [ref=e63]:
+          - generic [ref=e64]: 8h ago
+          - generic [ref=e65]:
+            - button "Edit" [ref=e66]:
+              - img [ref=e67]
+            - button "Delete" [ref=e69]:
+              - img [ref=e70]
+  - contentinfo [ref=e73]:
+    - paragraph [ref=e74]: © 2026 Lumina. Built for the love of bookmarks.

@@ -1,0 +1,31 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e8]
+        - generic [ref=e10]:
+          - heading "Lumina" [level=1] [ref=e11]
+          - paragraph [ref=e12]: Intelligent Bookmark Library
+      - generic [ref=e13]:
+        - link "GitHub" [ref=e14] [cursor=pointer]:
+          - /url: https://github.com
+        - link "Collections" [ref=e15] [cursor=pointer]:
+          - /url: /collections
+        - button "Add bookmark" [ref=e16]
+        - button "Log out" [ref=e17]
+  - generic [ref=e21]:
+    - generic [ref=e22]:
+      - generic:
+        - img
+      - textbox "Search bookmarks or tags..." [ref=e23]
+    - generic [ref=e24]:
+      - generic [ref=e25]: 0 / 0
+      - button "Clear all" [disabled] [ref=e26]
+  - main [ref=e29]:
+    - generic [ref=e30]:
+      - img [ref=e32]
+      - heading "No bookmarks found" [level=2] [ref=e34]
+      - paragraph [ref=e35]: Try adjusting your search or clearing filters to see more results.
+      - button "Clear all filters" [ref=e36]
+  - contentinfo [ref=e37]:
+    - paragraph [ref=e38]: © 2026 Lumina. Built for the love of bookmarks.
