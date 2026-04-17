@@ -56,6 +56,8 @@ export function setTokens(tokens: AuthTokens) {
   refreshTokenValue = tokens.refresh_token;
   localStorage.setItem("accessToken", accessToken);
   localStorage.setItem("refreshToken", refreshTokenValue);
+  // Broadcast to extension
+  window.postMessage({ type: "LUMINA_SET_TOKEN", token: tokens.access_token }, "*");
 }
 
 export function clearTokens() {
@@ -63,6 +65,7 @@ export function clearTokens() {
   refreshTokenValue = null;
   localStorage.removeItem("accessToken");
   localStorage.removeItem("refreshToken");
+  window.postMessage({ type: "LUMINA_CLEAR_TOKEN" }, "*");
 }
 
 export function getAccessToken(): string | null {
@@ -259,4 +262,49 @@ export async function deleteCollection(id: string): Promise<void> {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete collection");
+}
+
+export interface ImportStatus {
+  status: string;
+  total: number;
+  processed: number;
+  errors: number;
+  bookmark_ids: string[];
+  error_detail: string | null;
+}
+
+export async function importBookmarks(file: File): Promise<{ imported?: number; bookmark_ids?: string[]; task_id?: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${API_BASE_URL}/api/bookmarks/import`, {
+    method: "POST",
+    headers: {
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: formData,
+  });
+  if (!res.ok) throw new Error("Import failed");
+  return res.json();
+}
+
+export async function fetchImportStatus(taskId: string): Promise<ImportStatus> {
+  const res = await apiFetch(`/api/bookmarks/import-status/${taskId}`);
+  if (!res.ok) throw new Error("Failed to fetch import status");
+  return res.json();
+}
+
+export async function exportBookmarks(format: "json" | "netscape"): Promise<Blob> {
+  const res = await apiFetch(`/api/bookmarks/export?format=${format}`);
+  if (!res.ok) throw new Error("Export failed");
+  return res.blob();
+}
+
+export async function fetchSuggestedTagsForUrl(url: string, title: string): Promise<string[]> {
+  const res = await apiFetch("/api/bookmarks/suggest-tags", {
+    method: "POST",
+    body: JSON.stringify({ url, title }),
+  });
+  if (!res.ok) throw new Error("Failed to fetch suggested tags");
+  const data = await res.json();
+  return data.suggested_tags || [];
 }

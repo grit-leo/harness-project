@@ -6,6 +6,7 @@ import App from "./App.tsx";
 import { LoginPage } from "./pages/LoginPage.tsx";
 import { SignupPage } from "./pages/SignupPage.tsx";
 import { CollectionsPage } from "./pages/CollectionsPage.tsx";
+import { SettingsPage } from "./pages/SettingsPage.tsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.tsx";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -50,6 +51,14 @@ createRoot(document.getElementById("root")!).render(
             element={
               <ProtectedRoute>
                 <CollectionsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
               </ProtectedRoute>
             }
           />

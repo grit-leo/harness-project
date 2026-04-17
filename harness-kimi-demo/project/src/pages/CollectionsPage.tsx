@@ -148,6 +148,12 @@ export function CollectionsPage() {
             >
               Library
             </Link>
+            <Link
+              to="/settings"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+            >
+              Settings
+            </Link>
             <button
               onClick={() => setModalOpen(true)}
               className="rounded-lg bg-indigo-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-600"

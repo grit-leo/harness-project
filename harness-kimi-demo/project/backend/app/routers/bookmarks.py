@@ -1,5 +1,6 @@
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File
+from fastapi.responses import StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import get_current_user
@@ -14,6 +15,10 @@ from app.schemas.bookmark import (
     ApplyTagsPayload,
 )
 from app.services import ai_service
+from app.services.netscape_parser import parse_netscape_html
+from app.services.netscape_exporter import bookmarks_to_netscape_html
+from app.services.import_task import create_task, run_import_task, get_task
+import json
 
 router = APIRouter(prefix="/api/bookmarks", tags=["bookmarks"])
 
@@ -84,6 +89,28 @@ def create_bookmark(
     return bookmark
 
 
+@router.post("/suggest-tags", response_model=SuggestedTagsOut)
+def suggest_tags(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    url = payload.get("url", "")
+    title = payload.get("title", "")
+    if not url:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="url is required")
+    result = ai_service.fetch_and_enrich(url)
+    suggested = result.get("tags", [])
+    if not suggested and title:
+        # Fallback: derive a tag from domain
+        from urllib.parse import urlparse
+        hostname = urlparse(url).hostname or ""
+        hostname = hostname.replace("www.", "").split(".")[0]
+        if hostname:
+            suggested = [hostname]
+    return {"suggested_tags": suggested}
+
+
 @router.get("/{bookmark_id}/suggested-tags", response_model=SuggestedTagsOut)
 def get_suggested_tags(
     bookmark_id: str,
@@ -150,3 +177,122 @@ def delete_bookmark(
     db.delete(bookmark)
     db.commit()
     return None
+
+
+# Import endpoints
+
+@router.post("/import")
+def import_bookmarks(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not file.filename or not file.filename.endswith((".html", ".htm")):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File must be a Netscape HTML bookmark file (.html or .htm)")
+    try:
+        content = file.file.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to read file: {e}")
+
+    parsed = parse_netscape_html(content)
+    if not parsed:
+        return {"imported": 0, "bookmark_ids": []}
+
+    if len(parsed) <= 50:
+        # Synchronous import
+        imported_ids = []
+        for pb in parsed:
+            try:
+                bookmark = Bookmark(
+                    user_id=current_user.id,
+                    url=pb.url,
+                    title=pb.title or pb.url,
+                    summary="",
+                )
+                db.add(bookmark)
+                db.flush()
+                if pb.folder:
+                    bookmark.tags = ensure_tags(db, current_user, [pb.folder])
+                db.commit()
+                db.refresh(bookmark)
+                imported_ids.append(bookmark.id)
+            except Exception:
+                db.rollback()
+        return {"imported": len(imported_ids), "bookmark_ids": imported_ids}
+
+    # Async import for large files
+    task = create_task(total=len(parsed))
+    background_tasks.add_task(run_import_task, task.id, str(current_user.id), parsed)
+    return {"task_id": task.id}
+
+
+@router.get("/import-status/{task_id}")
+def import_status(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    task = get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    return {
+        "status": task.status,
+        "total": task.total,
+        "processed": task.processed,
+        "errors": task.errors,
+        "bookmark_ids": task.bookmark_ids,
+        "error_detail": task.error_detail,
+    }
+
+
+# Export endpoints
+
+@router.get("/export")
+def export_bookmarks(
+    format: str = Query("json"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    bookmarks = (
+        db.query(Bookmark)
+        .filter(Bookmark.user_id == current_user.id)
+        .order_by(Bookmark.created_at.desc())
+        .all()
+    )
+
+    if format == "netscape":
+        bm_dicts = []
+        for bm in bookmarks:
+            bm_dicts.append({
+                "id": bm.id,
+                "url": bm.url,
+                "title": bm.title,
+                "tags": [t.name for t in bm.tags],
+                "summary": bm.summary or "",
+                "created_at": bm.created_at.isoformat() if bm.created_at else None,
+                "updated_at": bm.updated_at.isoformat() if bm.updated_at else None,
+            })
+        html = bookmarks_to_netscape_html(bm_dicts)
+        return StreamingResponse(
+            iter([html]),
+            media_type="text/html",
+            headers={"Content-Disposition": 'attachment; filename="lumina-bookmarks.html"'},
+        )
+
+    # JSON default
+    result = []
+    for bm in bookmarks:
+        result.append({
+            "id": bm.id,
+            "url": bm.url,
+            "title": bm.title,
+            "tags": [t.name for t in bm.tags],
+            "summary": bm.summary or "",
+            "created_at": bm.created_at.isoformat() if bm.created_at else None,
+            "updated_at": bm.updated_at.isoformat() if bm.updated_at else None,
+        })
+    return StreamingResponse(
+        iter([json.dumps(result, indent=2)]),
+        media_type="application/json",
+        headers={"Content-Disposition": 'attachment; filename="lumina-bookmarks.json"'},
+    )
