@@ -26,7 +26,7 @@ def _evaluate_collection(bookmarks: list[Bookmark], rules: dict):
             value = cond.get("value")
             match = False
             if field == "date" and op_ == "last_n_days":
-                cutoff = datetime.now(timezone.utc) - timedelta(days=int(value))
+                cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=int(value))
                 match = bool(bm.created_at and bm.created_at >= cutoff)
             elif field == "domain" and op_ == "equals":
                 hostname = urlparse(bm.url).hostname or ""

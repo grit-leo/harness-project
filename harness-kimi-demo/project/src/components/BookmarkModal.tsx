@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { Bookmark, BookmarkCreate } from "../api/client";
+import { fetchSuggestedTags, type Bookmark, type BookmarkCreate } from "../api/client";
 
 interface BookmarkModalProps {
   isOpen: boolean;
@@ -23,6 +23,7 @@ export function BookmarkModal({
   const [tagsInput, setTagsInput] = useState("");
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [loadingSuggested, setLoadingSuggested] = useState(false);
 
   const isEditing = !!initialData;
 
@@ -35,6 +36,14 @@ export function BookmarkModal({
         setTags(initialData.tags);
         setTagsInput(initialData.tags.join(", "));
         setSuggestedTags(initialData.suggestedTags || []);
+        // Fetch fresh suggested tags from the API
+        setLoadingSuggested(true);
+        fetchSuggestedTags(initialData.id)
+          .then((tags) => setSuggestedTags(tags))
+          .catch(() => {
+            // silently fail; keep any tags already in initialData
+          })
+          .finally(() => setLoadingSuggested(false));
       } else {
         setUrl("");
         setTitle("");
@@ -134,11 +143,14 @@ export function BookmarkModal({
             </p>
           </div>
 
-          {suggestedTags.length > 0 && (
+          {(suggestedTags.length > 0 || loadingSuggested) && (
             <div>
               <label className="mb-2 block text-sm font-medium text-emerald-400">
                 AI Suggested Tags
               </label>
+              {loadingSuggested && suggestedTags.length === 0 && (
+                <p className="text-xs text-slate-500">Generating suggestions…</p>
+              )}
               <div className="flex flex-wrap gap-2">
                 {suggestedTags.map((tag, idx) => (
                   <div
