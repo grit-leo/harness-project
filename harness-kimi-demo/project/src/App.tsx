@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 import { BookmarkCard } from "./components/BookmarkCard";
 import { FilterBar } from "./components/FilterBar";
+import { BookmarkModal } from "./components/BookmarkModal";
 import { useBookmarkFilter } from "./hooks/useBookmarkFilter";
 import { useAuth } from "./context/AuthContext";
 import {
   fetchBookmarks,
   fetchTags,
+  createBookmark,
+  updateBookmark,
+  deleteBookmark,
   type Bookmark,
   type Tag,
+  type BookmarkCreate,
 } from "./api/client";
 
 function App() {
@@ -16,6 +21,8 @@ function App() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
 
   const {
     searchQuery,
@@ -67,6 +74,47 @@ function App() {
     };
   }, [searchQuery, selectedTags.join(",")]);
 
+  const handleAdd = () => {
+    setEditingBookmark(null);
+    setModalOpen(true);
+  };
+
+  const handleEdit = (bookmark: Bookmark) => {
+    setEditingBookmark(bookmark);
+    setModalOpen(true);
+  };
+
+  const handleDelete = async (bookmark: Bookmark) => {
+    if (!confirm("Are you sure you want to delete this bookmark?")) return;
+    try {
+      await deleteBookmark(bookmark.id);
+      setBookmarks((prev) => prev.filter((b) => b.id !== bookmark.id));
+    } catch (err: any) {
+      setError(err.message || "Failed to delete bookmark");
+    }
+  };
+
+  const handleModalSubmit = async (payload: BookmarkCreate) => {
+    try {
+      if (editingBookmark) {
+        const updated = await updateBookmark(editingBookmark.id, payload);
+        setBookmarks((prev) =>
+          prev.map((b) => (b.id === updated.id ? updated : b))
+        );
+      } else {
+        const created = await createBookmark(payload);
+        setBookmarks((prev) => [created, ...prev]);
+      }
+      // Refresh tags in case new ones were created
+      const freshTags = await fetchTags();
+      setTags(freshTags);
+      setModalOpen(false);
+      setEditingBookmark(null);
+    } catch (err: any) {
+      setError(err.message || "Failed to save bookmark");
+    }
+  };
+
   return (
     <div className="min-h-svh bg-slate-950">
       <header className="border-b border-slate-800/60 bg-slate-950">
@@ -106,6 +154,12 @@ function App() {
             >
               GitHub
             </a>
+            <button
+              onClick={handleAdd}
+              className="rounded-lg bg-indigo-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-600"
+            >
+              Add bookmark
+            </button>
             <button
               onClick={logout}
               className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
@@ -203,6 +257,8 @@ function App() {
                 bookmark={bookmark}
                 onTagClick={toggleTag}
                 selectedTags={selectedTags}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
               />
             ))}
           </div>
@@ -212,6 +268,16 @@ function App() {
       <footer className="mx-auto max-w-7xl px-4 py-8 text-center text-xs text-slate-600 sm:px-6 lg:px-8">
         <p>© {new Date().getFullYear()} Lumina. Built for the love of bookmarks.</p>
       </footer>
+
+      <BookmarkModal
+        isOpen={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingBookmark(null);
+        }}
+        onSubmit={handleModalSubmit}
+        initialData={editingBookmark}
+      />
     </div>
   );
 }
