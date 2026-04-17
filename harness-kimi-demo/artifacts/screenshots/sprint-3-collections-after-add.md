@@ -1,0 +1,63 @@
+- generic [ref=e347]:
+  - banner [ref=e348]:
+    - generic [ref=e349]:
+      - generic [ref=e350]:
+        - img [ref=e352]
+        - generic [ref=e354]:
+          - heading "Lumina" [level=1] [ref=e355]
+          - paragraph [ref=e356]: Collections
+      - generic [ref=e357]:
+        - link "Library" [ref=e358] [cursor=pointer]:
+          - /url: /
+        - button "New collection" [ref=e359]
+  - main [ref=e360]:
+    - generic [ref=e361]:
+      - complementary [ref=e362]:
+        - generic [ref=e363]:
+          - heading "Your Collections" [level=2] [ref=e364]
+          - list [ref=e365]:
+            - listitem [ref=e366]:
+              - button "AI GitHub" [ref=e367]:
+                - generic [ref=e368]: AI GitHub
+              - button "Delete" [ref=e370]
+            - listitem [ref=e371]:
+              - button "GitHub Links" [ref=e372]:
+                - generic [ref=e373]: GitHub Links
+            - listitem [ref=e374]:
+              - button "Unread Last 7 Days Default" [ref=e375]:
+                - generic [ref=e376]: Unread Last 7 Days
+                - generic [ref=e377]: Default
+            - listitem [ref=e378]:
+              - button "Design Inspiration Default" [ref=e379]:
+                - generic [ref=e380]: Design Inspiration
+                - generic [ref=e381]: Default
+            - listitem [ref=e382]:
+              - button "Recent Reads Default" [ref=e383]:
+                - generic [ref=e384]: Recent Reads
+                - generic [ref=e385]: Default
+      - generic [ref=e386]:
+        - generic [ref=e388]:
+          - heading "AI GitHub" [level=2] [ref=e389]
+          - paragraph [ref=e390]: 2 bookmarks
+        - generic [ref=e391]:
+          - article [ref=e392]:
+            - link "AI Research Paper github.com" [ref=e393] [cursor=pointer]:
+              - /url: https://github.com/ai-research/paper
+              - generic [ref=e394]:
+                - heading "AI Research Paper" [level=3] [ref=e395]
+                - paragraph [ref=e396]: github.com
+            - paragraph [ref=e397]: A paper about AI research.
+            - generic [ref=e398]:
+              - button "research" [ref=e399]
+              - button "machine-learning" [ref=e400]
+              - button "ai" [ref=e401]
+            - generic [ref=e403]: 8h ago
+          - article [ref=e406]:
+            - link "New AI Project github.com" [ref=e407] [cursor=pointer]:
+              - /url: https://github.com/new-ai-project
+              - generic [ref=e408]:
+                - heading "New AI Project" [level=3] [ref=e409]
+                - paragraph [ref=e410]: github.com
+            - paragraph [ref=e411]: A new AI project on GitHub.
+            - button "ai" [ref=e413]
+            - generic [ref=e415]: 8h ago

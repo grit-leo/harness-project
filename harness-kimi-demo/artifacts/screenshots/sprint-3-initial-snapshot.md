@@ -1,0 +1,62 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e8]
+        - generic [ref=e10]:
+          - heading "Lumina" [level=1] [ref=e11]
+          - paragraph [ref=e12]: Intelligent Bookmark Library
+      - generic [ref=e13]:
+        - link "GitHub" [ref=e14] [cursor=pointer]:
+          - /url: https://github.com
+        - link "Collections" [ref=e15] [cursor=pointer]:
+          - /url: /collections
+        - button "Add bookmark" [ref=e16]
+        - button "Log out" [ref=e17]
+  - generic [ref=e20]:
+    - generic [ref=e21]:
+      - generic [ref=e22]:
+        - generic:
+          - img
+        - textbox "Search bookmarks or tags..." [ref=e23]
+      - generic [ref=e24]:
+        - generic [ref=e25]: 2 / 2
+        - button "Clear all" [disabled] [ref=e26]
+    - generic [ref=e28]:
+      - button "ai" [ref=e29]
+      - button "research" [ref=e30]
+  - main [ref=e31]:
+    - generic [ref=e32]:
+      - article [ref=e33]:
+        - link "Test Article example.com" [ref=e34] [cursor=pointer]:
+          - /url: https://example.com/test-article
+          - generic [ref=e35]:
+            - heading "Test Article" [level=3] [ref=e36]
+            - paragraph [ref=e37]: example.com
+        - paragraph [ref=e38]: A test article about technology.
+        - generic [ref=e39]:
+          - generic [ref=e40]: 8h ago
+          - generic [ref=e41]:
+            - button "Edit" [ref=e42]:
+              - img [ref=e43]
+            - button "Delete" [ref=e45]:
+              - img [ref=e46]
+      - article [ref=e49]:
+        - link "AI Research Paper github.com" [ref=e50] [cursor=pointer]:
+          - /url: https://github.com/ai-research/paper
+          - generic [ref=e51]:
+            - heading "AI Research Paper" [level=3] [ref=e52]
+            - paragraph [ref=e53]: github.com
+        - paragraph [ref=e54]: A paper about AI research.
+        - generic [ref=e55]:
+          - button "research" [ref=e56]
+          - button "ai" [ref=e57]
+        - generic [ref=e58]:
+          - generic [ref=e59]: 8h ago
+          - generic [ref=e60]:
+            - button "Edit" [ref=e61]:
+              - img [ref=e62]
+            - button "Delete" [ref=e64]:
+              - img [ref=e65]
+  - contentinfo [ref=e68]:
+    - paragraph [ref=e69]: © 2026 Lumina. Built for the love of bookmarks.

@@ -13,10 +13,11 @@ from app.models.bookmark import Bookmark
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+MOCK_AI = os.getenv("MOCK_AI", "").lower() in ("1", "true", "yes")
 
 
-def _content_hash(url: str) -> str:
-    return hashlib.sha256(url.encode("utf-8")).hexdigest()
+def _content_hash(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 def _strip_html(html: str) -> str:
@@ -41,6 +42,11 @@ def _get_cached(db: Session, content_hash: str):
 
 
 def _call_llm(text: str) -> dict:
+    if MOCK_AI:
+        return {
+            "tags": ["demo-tag", "sample", "mock-ai"],
+            "summary": "This is a mock summary generated because MOCK_AI is enabled.",
+        }
     if not OPENAI_API_KEY:
         return {"tags": [], "summary": ""}
     prompt = (
@@ -84,10 +90,6 @@ def _call_llm(text: str) -> dict:
 def fetch_and_enrich(url: str) -> dict:
     db = SessionLocal()
     try:
-        h = _content_hash(url)
-        cached = _get_cached(db, h)
-        if cached:
-            return {"tags": cached.tags, "summary": cached.summary}
         try:
             resp = httpx.get(
                 url,
@@ -99,6 +101,10 @@ def fetch_and_enrich(url: str) -> dict:
             raw_html = resp.text
         except Exception:
             raw_html = ""
+        h = _content_hash(raw_html)
+        cached = _get_cached(db, h)
+        if cached:
+            return {"tags": cached.tags, "summary": cached.summary}
         text = _strip_html(raw_html)
         text = _truncate_text(text)
         if not text:

@@ -1,0 +1,75 @@
+- generic [ref=e121]:
+  - banner [ref=e122]:
+    - generic [ref=e123]:
+      - generic [ref=e124]:
+        - img [ref=e126]
+        - generic [ref=e128]:
+          - heading "Lumina" [level=1] [ref=e129]
+          - paragraph [ref=e130]: Collections
+      - generic [ref=e131]:
+        - link "Library" [ref=e132] [cursor=pointer]:
+          - /url: /
+        - button "New collection" [active] [ref=e133]
+  - main [ref=e134]:
+    - generic [ref=e135]:
+      - complementary [ref=e136]:
+        - generic [ref=e137]:
+          - heading "Your Collections" [level=2] [ref=e138]
+          - list [ref=e139]:
+            - listitem [ref=e140]:
+              - button "GitHub Links" [ref=e141]:
+                - generic [ref=e142]: GitHub Links
+            - listitem [ref=e145]:
+              - button "Unread Last 7 Days Default" [ref=e146]:
+                - generic [ref=e147]: Unread Last 7 Days
+                - generic [ref=e148]: Default
+            - listitem [ref=e149]:
+              - button "Design Inspiration Default" [ref=e150]:
+                - generic [ref=e151]: Design Inspiration
+                - generic [ref=e152]: Default
+            - listitem [ref=e153]:
+              - button "Recent Reads Default" [ref=e154]:
+                - generic [ref=e155]: Recent Reads
+                - generic [ref=e156]: Default
+      - generic [ref=e157]:
+        - generic [ref=e159]:
+          - heading "Recent Reads" [level=2] [ref=e190]
+          - paragraph [ref=e161]: 1 bookmark
+        - article [ref=e191]:
+          - link "AI Research Paper github.com" [ref=e192] [cursor=pointer]:
+            - /url: https://github.com/ai-research/paper
+            - generic [ref=e193]:
+              - heading "AI Research Paper" [level=3] [ref=e194]
+              - paragraph [ref=e195]: github.com
+          - paragraph [ref=e196]: A paper about AI research.
+          - generic [ref=e197]:
+            - button "research" [ref=e198]
+            - button "machine-learning" [ref=e199]
+            - button "ai" [ref=e200]
+          - generic [ref=e202]: 8h ago
+  - generic [ref=e206]:
+    - heading "New Collection" [level=3] [ref=e207]
+    - generic [ref=e208]:
+      - generic [ref=e209]:
+        - generic [ref=e210]: Name
+        - textbox "e.g., Weekend Reads" [ref=e211]
+      - generic [ref=e212]:
+        - generic [ref=e213]: Match operator
+        - generic [ref=e214]:
+          - button "AND" [ref=e215]
+          - button "OR" [ref=e216]
+      - generic [ref=e217]:
+        - generic [ref=e218]: Conditions
+        - generic [ref=e219]:
+          - combobox [ref=e220]:
+            - option "Tag" [selected]
+            - option "Domain"
+            - option "Date"
+          - combobox [ref=e221]:
+            - option "equals" [selected]
+          - textbox "design" [ref=e222]
+          - button "×" [ref=e223]
+        - button "+ Add condition" [ref=e224]
+      - generic [ref=e225]:
+        - button "Cancel" [ref=e226]
+        - button "Save collection" [ref=e227]

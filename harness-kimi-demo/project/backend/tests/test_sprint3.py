@@ -31,14 +31,14 @@ def test_ai_cache_prevents_duplicate_llm_call(db):
     try:
         with patch("app.services.ai_service.httpx.get", return_value=_mock_httpx_get()):
             r1 = ai_service.fetch_and_enrich(url)
-        assert r1["tags"] == ["python", "ai"]
-        assert call_count == 1
+            assert r1["tags"] == ["python", "ai"]
+            assert call_count == 1
 
-        r2 = ai_service.fetch_and_enrich(url)
-        assert r2["tags"] == ["python", "ai"]
-        assert call_count == 1
+            r2 = ai_service.fetch_and_enrich(url)
+            assert r2["tags"] == ["python", "ai"]
+            assert call_count == 1
 
-        cached = db.query(ai_service.AICache).filter(ai_service.AICache.content_hash == ai_service._content_hash(url)).first()
+        cached = db.query(ai_service.AICache).filter(ai_service.AICache.content_hash == ai_service._content_hash(_mock_httpx_get().text)).first()
         assert cached is not None
         assert cached.summary == "A short summary."
     finally:

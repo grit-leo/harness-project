@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BookmarkCard } from "../components/BookmarkCard";
+import { BookmarkModal } from "../components/BookmarkModal";
 import {
   fetchCollections,
   fetchCollectionBookmarks,
   createCollection,
   deleteCollection,
+  createBookmark,
   type Collection,
   type Bookmark,
   type Condition,
+  type BookmarkCreate,
 } from "../api/client";
 
 export function CollectionsPage() {
@@ -25,6 +28,7 @@ export function CollectionsPage() {
   const [builderConditions, setBuilderConditions] = useState<Condition[]>([
     { field: "tag", op: "equals", value: "" },
   ]);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const loadCollections = async () => {
     try {
@@ -145,8 +149,14 @@ export function CollectionsPage() {
               Library
             </Link>
             <button
-              onClick={() => setBuilderOpen(true)}
+              onClick={() => setModalOpen(true)}
               className="rounded-lg bg-indigo-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-600"
+            >
+              Add bookmark
+            </button>
+            <button
+              onClick={() => setBuilderOpen(true)}
+              className="rounded-lg bg-emerald-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
             >
               New collection
             </button>
@@ -261,6 +271,20 @@ export function CollectionsPage() {
           </div>
         )}
       </main>
+
+      <BookmarkModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSubmit={async (payload: BookmarkCreate) => {
+          await createBookmark(payload);
+          setModalOpen(false);
+          if (selectedId) {
+            const data = await fetchCollectionBookmarks(selectedId);
+            setBookmarks(data);
+          }
+          await loadCollections();
+        }}
+      />
 
       {/* Rule Builder Modal */}
       {builderOpen && (

@@ -1,0 +1,50 @@
+- generic [ref=e121]:
+  - banner [ref=e122]:
+    - generic [ref=e123]:
+      - generic [ref=e124]:
+        - img [ref=e126]
+        - generic [ref=e128]:
+          - heading "Lumina" [level=1] [ref=e129]
+          - paragraph [ref=e130]: Collections
+      - generic [ref=e131]:
+        - link "Library" [ref=e132] [cursor=pointer]:
+          - /url: /
+        - button "New collection" [ref=e133]
+  - main [ref=e134]:
+    - generic [ref=e135]:
+      - complementary [ref=e136]:
+        - generic [ref=e137]:
+          - heading "Your Collections" [level=2] [ref=e138]
+          - list [ref=e139]:
+            - listitem [ref=e140]:
+              - button "GitHub Links" [ref=e141]:
+                - generic [ref=e142]: GitHub Links
+              - button "Delete" [ref=e144]
+            - listitem [ref=e145]:
+              - button "Unread Last 7 Days Default" [ref=e146]:
+                - generic [ref=e147]: Unread Last 7 Days
+                - generic [ref=e148]: Default
+            - listitem [ref=e149]:
+              - button "Design Inspiration Default" [ref=e150]:
+                - generic [ref=e151]: Design Inspiration
+                - generic [ref=e152]: Default
+            - listitem [ref=e153]:
+              - button "Recent Reads Default" [ref=e154]:
+                - generic [ref=e155]: Recent Reads
+                - generic [ref=e156]: Default
+      - generic [ref=e157]:
+        - generic [ref=e159]:
+          - heading "GitHub Links" [level=2] [ref=e160]
+          - paragraph [ref=e161]: 1 bookmark
+        - article [ref=e163]:
+          - link "AI Research Paper github.com" [ref=e164] [cursor=pointer]:
+            - /url: https://github.com/ai-research/paper
+            - generic [ref=e165]:
+              - heading "AI Research Paper" [level=3] [ref=e166]
+              - paragraph [ref=e167]: github.com
+          - paragraph [ref=e168]: A paper about AI research.
+          - generic [ref=e169]:
+            - button "research" [ref=e170]
+            - button "machine-learning" [ref=e171]
+            - button "ai" [ref=e172]
+          - generic [ref=e174]: 8h ago
