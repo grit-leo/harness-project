@@ -1,0 +1,47 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e8]
+        - generic [ref=e10]:
+          - heading "Lumina" [level=1] [ref=e11]
+          - paragraph [ref=e12]: Collections
+      - generic [ref=e13]:
+        - link "Library" [ref=e14] [cursor=pointer]:
+          - /url: /
+        - link "Discover" [ref=e15] [cursor=pointer]:
+          - /url: /discover
+        - link "Settings" [ref=e16] [cursor=pointer]:
+          - /url: /settings
+        - button "Add bookmark" [ref=e17]
+        - button "New collection" [ref=e18]
+  - main [ref=e19]:
+    - generic [ref=e20]:
+      - complementary [ref=e21]:
+        - generic [ref=e22]:
+          - heading "Your Collections" [level=2] [ref=e23]
+          - list [ref=e24]:
+            - listitem [ref=e25]:
+              - button "Unread Last 7 Days Default" [ref=e26]:
+                - generic [ref=e27]: Unread Last 7 Days
+                - generic [ref=e28]: Default
+            - listitem [ref=e29]:
+              - button "Design Inspiration Default" [ref=e30]:
+                - generic [ref=e31]: Design Inspiration
+                - generic [ref=e32]: Default
+            - listitem [ref=e33]:
+              - button "Recent Reads Default" [ref=e34]:
+                - generic [ref=e35]: Recent Reads
+                - generic [ref=e36]: Default
+      - generic [ref=e37]:
+        - generic [ref=e38]:
+          - generic [ref=e39]:
+            - heading "Unread Last 7 Days" [level=2] [ref=e41]
+            - paragraph [ref=e42]: 0 bookmarks
+          - generic [ref=e43]:
+            - combobox [ref=e44]:
+              - option "Private" [selected]
+              - option "Public read-only"
+              - option "Shared edit"
+            - button "Collaborators" [ref=e48]
+        - paragraph [ref=e50]: No bookmarks match this collection’s rules.
