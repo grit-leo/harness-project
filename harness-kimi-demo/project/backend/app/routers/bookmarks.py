@@ -1,12 +1,19 @@
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.user import User
 from app.models.bookmark import Bookmark
 from app.models.tag import Tag
-from app.schemas.bookmark import BookmarkCreate, BookmarkUpdate, BookmarkOut
+from app.schemas.bookmark import (
+    BookmarkCreate,
+    BookmarkUpdate,
+    BookmarkOut,
+    SuggestedTagsOut,
+    ApplyTagsPayload,
+)
+from app.services import ai_service
 
 router = APIRouter(prefix="/api/bookmarks", tags=["bookmarks"])
 
@@ -57,6 +64,7 @@ def list_bookmarks(
 @router.post("", response_model=BookmarkOut, status_code=status.HTTP_201_CREATED)
 def create_bookmark(
     payload: BookmarkCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -70,6 +78,36 @@ def create_bookmark(
     db.flush()
     if payload.tags:
         bookmark.tags = ensure_tags(db, current_user, payload.tags)
+    db.commit()
+    db.refresh(bookmark)
+    background_tasks.add_task(ai_service.enrich_bookmark, str(bookmark.id), str(bookmark.url))
+    return bookmark
+
+
+@router.get("/{bookmark_id}/suggested-tags", response_model=SuggestedTagsOut)
+def get_suggested_tags(
+    bookmark_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    bookmark = db.query(Bookmark).filter(Bookmark.id == bookmark_id, Bookmark.user_id == current_user.id).first()
+    if not bookmark:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bookmark not found")
+    return {"suggested_tags": bookmark.suggested_tags or []}
+
+
+@router.post("/{bookmark_id}/apply-tags", response_model=BookmarkOut)
+def apply_tags(
+    bookmark_id: str,
+    payload: ApplyTagsPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    bookmark = db.query(Bookmark).filter(Bookmark.id == bookmark_id, Bookmark.user_id == current_user.id).first()
+    if not bookmark:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bookmark not found")
+    bookmark.tags = ensure_tags(db, current_user, payload.tags)
+    bookmark.suggested_tags = []
     db.commit()
     db.refresh(bookmark)
     return bookmark

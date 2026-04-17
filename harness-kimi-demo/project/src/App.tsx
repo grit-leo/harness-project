@@ -4,12 +4,14 @@ import { FilterBar } from "./components/FilterBar";
 import { BookmarkModal } from "./components/BookmarkModal";
 import { useBookmarkFilter } from "./hooks/useBookmarkFilter";
 import { useAuth } from "./context/AuthContext";
+import { Link } from "react-router-dom";
 import {
   fetchBookmarks,
   fetchTags,
   createBookmark,
   updateBookmark,
   deleteBookmark,
+  applyTags,
   type Bookmark,
   type Tag,
   type BookmarkCreate,
@@ -108,10 +110,25 @@ function App() {
       // Refresh tags in case new ones were created
       const freshTags = await fetchTags();
       setTags(freshTags);
+      if (!editingBookmark) {
+        setModalOpen(false);
+        setEditingBookmark(null);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to save bookmark");
+    }
+  };
+
+  const handleApplyTags = async (id: string, tags: string[]) => {
+    try {
+      const updated = await applyTags(id, tags);
+      setBookmarks((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+      const freshTags = await fetchTags();
+      setTags(freshTags);
       setModalOpen(false);
       setEditingBookmark(null);
     } catch (err: any) {
-      setError(err.message || "Failed to save bookmark");
+      setError(err.message || "Failed to apply tags");
     }
   };
 
@@ -154,6 +171,12 @@ function App() {
             >
               GitHub
             </a>
+            <Link
+              to="/collections"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+            >
+              Collections
+            </Link>
             <button
               onClick={handleAdd}
               className="rounded-lg bg-indigo-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-600"
@@ -276,6 +299,7 @@ function App() {
           setEditingBookmark(null);
         }}
         onSubmit={handleModalSubmit}
+        onApplyTags={handleApplyTags}
         initialData={editingBookmark}
       />
     </div>

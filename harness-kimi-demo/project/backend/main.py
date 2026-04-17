@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, bookmarks, tags
+from app.routers import auth, bookmarks, tags, collections
 
-app = FastAPI(title="Lumina API", version="0.2.0")
+app = FastAPI(title="Lumina API", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,6 +15,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(bookmarks.router)
 app.include_router(tags.router)
+app.include_router(collections.router)
 
 
 @app.get("/health")

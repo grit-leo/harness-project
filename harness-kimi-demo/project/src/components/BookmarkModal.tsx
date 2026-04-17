@@ -4,7 +4,8 @@ import type { Bookmark, BookmarkCreate } from "../api/client";
 interface BookmarkModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (payload: BookmarkCreate) => void;
+  onSubmit: (payload: BookmarkCreate) => void | Promise<void>;
+  onApplyTags?: (id: string, tags: string[]) => Promise<void>;
   initialData?: Bookmark | null;
 }
 
@@ -12,12 +13,16 @@ export function BookmarkModal({
   isOpen,
   onClose,
   onSubmit,
+  onApplyTags,
   initialData,
 }: BookmarkModalProps) {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [tagsInput, setTagsInput] = useState("");
+  const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const isEditing = !!initialData;
 
@@ -27,25 +32,41 @@ export function BookmarkModal({
         setUrl(initialData.url);
         setTitle(initialData.title);
         setSummary(initialData.summary);
+        setTags(initialData.tags);
         setTagsInput(initialData.tags.join(", "));
+        setSuggestedTags(initialData.suggestedTags || []);
       } else {
         setUrl("");
         setTitle("");
         setSummary("");
+        setTags([]);
         setTagsInput("");
+        setSuggestedTags([]);
       }
+      setEditingIndex(null);
     }
   }, [isOpen, initialData]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleTagsInputChange = (val: string) => {
+    setTagsInput(val);
+    setTags(
+      val
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0)
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const tags = tagsInput
-      .split(",")
-      .map((t) => t.trim())
-      .filter((t) => t.length > 0);
-    onSubmit({ url, title, summary, tags });
+    if (isEditing && onApplyTags && initialData) {
+      await onSubmit({ url, title, summary });
+      await onApplyTags(initialData.id, tags);
+    } else {
+      await onSubmit({ url, title, summary, tags });
+    }
   };
 
   return (
@@ -104,7 +125,7 @@ export function BookmarkModal({
             <input
               type="text"
               value={tagsInput}
-              onChange={(e) => setTagsInput(e.target.value)}
+              onChange={(e) => handleTagsInputChange(e.target.value)}
               placeholder="design, inspiration, blog"
               className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
@@ -112,6 +133,72 @@ export function BookmarkModal({
               Separate tags with commas
             </p>
           </div>
+
+          {suggestedTags.length > 0 && (
+            <div>
+              <label className="mb-2 block text-sm font-medium text-emerald-400">
+                AI Suggested Tags
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {suggestedTags.map((tag, idx) => (
+                  <div
+                    key={`${tag}-${idx}`}
+                    className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/60 px-3 py-1 text-xs text-slate-300"
+                  >
+                    {editingIndex === idx ? (
+                      <input
+                        autoFocus
+                        className="w-24 bg-transparent text-slate-200 outline-none"
+                        value={tag}
+                        onChange={(e) => {
+                          const next = [...suggestedTags];
+                          next[idx] = e.target.value;
+                          setSuggestedTags(next);
+                        }}
+                        onBlur={() => setEditingIndex(null)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") setEditingIndex(null);
+                        }}
+                      />
+                    ) : (
+                      <span
+                        className="cursor-pointer"
+                        onClick={() => setEditingIndex(idx)}
+                        title="Click to edit"
+                      >
+                        {tag}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!tags.includes(tag)) {
+                          const newTags = [...tags, tag];
+                          setTags(newTags);
+                          setTagsInput(newTags.join(", "));
+                        }
+                        setSuggestedTags(suggestedTags.filter((_, i) => i !== idx));
+                      }}
+                      className="ml-1 font-semibold text-emerald-400 hover:text-emerald-300"
+                      title="Accept"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSuggestedTags(suggestedTags.filter((_, i) => i !== idx))
+                      }
+                      className="text-slate-500 hover:text-slate-300"
+                      title="Reject"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-3 pt-2">
             <button

@@ -13,10 +13,48 @@ from app.core.security import (
     is_refresh_token_revoked,
 )
 from app.models.user import User
+from app.models.collection import Collection
 from app.schemas.auth import TokenPair
 from app.schemas.user import UserCreate
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+DEFAULT_COLLECTIONS = [
+    {
+        "name": "Unread Last 7 Days",
+        "rules_json": {
+            "operator": "AND",
+            "conditions": [{"field": "date", "op": "last_n_days", "value": 7}],
+        },
+        "is_default": True,
+    },
+    {
+        "name": "Design Inspiration",
+        "rules_json": {
+            "operator": "OR",
+            "conditions": [
+                {"field": "tag", "op": "equals", "value": "design"},
+                {"field": "tag", "op": "equals", "value": "inspiration"},
+            ],
+        },
+        "is_default": True,
+    },
+    {
+        "name": "Recent Reads",
+        "rules_json": {
+            "operator": "AND",
+            "conditions": [{"field": "domain", "op": "equals", "value": "github.com"}],
+        },
+        "is_default": True,
+    },
+]
+
+
+def _seed_default_collections(db: Session, user_id: str):
+    for data in DEFAULT_COLLECTIONS:
+        coll = Collection(user_id=user_id, **data)
+        db.add(coll)
+    db.commit()
 
 
 @router.post("/register", response_model=TokenPair, status_code=status.HTTP_201_CREATED)
@@ -28,6 +66,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+    _seed_default_collections(db, user.id)
     access_token = create_access_token({"sub": user.id})
     refresh_token = create_refresh_token({"sub": user.id})
     return {"access_token": access_token, "refresh_token": refresh_token}

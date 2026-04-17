@@ -6,6 +6,7 @@ export interface Bookmark {
   url: string;
   tags: string[];
   summary: string;
+  suggestedTags: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -20,6 +21,26 @@ export interface BookmarkCreate {
 export interface Tag {
   id: string;
   name: string;
+}
+
+export interface Condition {
+  field: "tag" | "domain" | "date";
+  op: "equals" | "last_n_days";
+  value: string | number;
+}
+
+export interface Rules {
+  operator: "AND" | "OR";
+  conditions: Condition[];
+}
+
+export interface Collection {
+  id: string;
+  name: string;
+  rules: Rules;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AuthTokens {
@@ -191,4 +212,51 @@ export async function deleteBookmark(id: string): Promise<void> {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete bookmark");
+}
+
+export async function fetchSuggestedTags(id: string): Promise<string[]> {
+  const res = await apiFetch(`/api/bookmarks/${id}/suggested-tags`);
+  if (!res.ok) throw new Error("Failed to fetch suggested tags");
+  const data = await res.json();
+  return data.suggested_tags || [];
+}
+
+export async function applyTags(id: string, tags: string[]): Promise<Bookmark> {
+  const res = await apiFetch(`/api/bookmarks/${id}/apply-tags`, {
+    method: "POST",
+    body: JSON.stringify({ tags }),
+  });
+  if (!res.ok) throw new Error("Failed to apply tags");
+  return res.json();
+}
+
+export async function fetchCollections(): Promise<Collection[]> {
+  const res = await apiFetch("/api/collections");
+  if (!res.ok) throw new Error("Failed to fetch collections");
+  return res.json();
+}
+
+export async function createCollection(payload: {
+  name: string;
+  rules: Rules;
+}): Promise<Collection> {
+  const res = await apiFetch("/api/collections", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("Failed to create collection");
+  return res.json();
+}
+
+export async function fetchCollectionBookmarks(id: string): Promise<Bookmark[]> {
+  const res = await apiFetch(`/api/collections/${id}/bookmarks`);
+  if (!res.ok) throw new Error("Failed to fetch collection bookmarks");
+  return res.json();
+}
+
+export async function deleteCollection(id: string): Promise<void> {
+  const res = await apiFetch(`/api/collections/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete collection");
 }

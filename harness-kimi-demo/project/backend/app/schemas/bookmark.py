@@ -25,6 +25,7 @@ class BookmarkOut(BaseModel):
     url: str
     tags: List[str]
     summary: str
+    suggestedTags: List[str] = Field(default=[], alias="suggested_tags", serialization_alias="suggestedTags")
     createdAt: datetime = Field(alias="created_at", serialization_alias="createdAt")
     updatedAt: datetime = Field(alias="updated_at", serialization_alias="updatedAt")
 
@@ -36,3 +37,21 @@ class BookmarkOut(BaseModel):
         if isinstance(v, list) and len(v) > 0 and hasattr(v[0], "name"):
             return [tag.name for tag in v]
         return v
+
+    @field_validator("suggestedTags", mode="before")
+    @classmethod
+    def default_suggested_tags(cls, v):
+        return v or []
+
+    @field_validator("summary", mode="before")
+    @classmethod
+    def default_summary(cls, v):
+        return v or ""
+
+
+class SuggestedTagsOut(BaseModel):
+    suggested_tags: List[str]
+
+
+class ApplyTagsPayload(BaseModel):
+    tags: List[str] = []
