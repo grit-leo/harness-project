@@ -1,0 +1,27 @@
+# Dependencies & builds
+**/node_modules/
+**/dist/
+**/.venv/
+**/venv/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Local DB & caches
+**/*.db
+**/*.sqlite3
+**/.pytest_cache/
+**/test-results/
+**/.playwright/
+
+# Logs & OS
+*.log
+.DS_Store
+.idea/
+
+# Env (never commit secrets)
+.env
+.env.*
+
+# Playwright MCP local cache (snapshots)
+**/.playwright-mcp/

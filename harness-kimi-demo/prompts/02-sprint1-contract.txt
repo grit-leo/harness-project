@@ -1,0 +1,32 @@
+You are a senior engineer. Read artifacts/spec.md carefully, focus on Sprint 1 ("Interactive Frontend Demo").
+
+Propose a Sprint 1 contract. Write the result to TWO files:
+1. artifacts/sprint-1-contract-draft.md  (your first draft)
+2. artifacts/sprint-1-contract-final.md  (copy the same content as the final version)
+
+The contract MUST include:
+
+# Sprint 1 Contract — Interactive Frontend Demo
+
+## Scope
+[WHAT you will build: specific components, pages, files]
+
+## Acceptance Criteria
+| # | Criterion | How to Verify |
+|---|-----------|---------------|
+| 1 | ... | ... |
+
+(Every criterion must be binary PASS/FAIL, concrete, and testable.)
+
+## Out of Scope
+- Backend / API / database — deferred to Sprint 2
+- AI features — deferred to Sprint 3
+
+## Dependencies
+- None (this is Sprint 1)
+
+## Tech Stack
+- React 18 + Vite + TypeScript + Tailwind CSS
+- All data from a mock module (no network calls)
+
+Important: Write BOTH files now (create them). Do NOT just print the content — actually create the files on disk.

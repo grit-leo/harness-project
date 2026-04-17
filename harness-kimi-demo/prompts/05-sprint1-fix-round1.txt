@@ -1,0 +1,31 @@
+You are a senior full-stack engineer. The QA team has FAILED Sprint 1. You must fix every issue they found.
+
+## CONTEXT
+- Product Spec: artifacts/spec.md
+- Sprint Contract: artifacts/sprint-1-contract-final.md
+- QA Report (Round 1): artifacts/sprint-1-qa-round-1.md
+- Project root: project/
+
+## YOUR TASK
+Read artifacts/sprint-1-qa-round-1.md carefully. Fix ALL bugs listed:
+
+1. **BUG-001: Desktop card width violates 320px minimum.** Replace the rigid breakpoint columns in App.tsx with CSS grid using `grid-cols-[repeat(auto-fill,minmax(320px,1fr))]` or equivalent to enforce 320px minimum card width.
+
+2. **BUG-002: Missing favicon/thumbnail placeholder.** In BookmarkCard.tsx, replace the initials avatar with a real favicon placeholder. Use Google's favicon service: `https://www.google.com/s2/favicons?domain=${hostname}&sz=64` or a generic placeholder icon that looks like a favicon/thumbnail.
+
+3. **BUG-003: React 19 installed instead of React 18.** Downgrade react and react-dom to ^18.x in package.json, then run npm install.
+
+4. **BUG-004: Undefined CSS utility scrollbar-hide.** Either define the scrollbar-hide class in index.css or remove it from FilterBar.tsx.
+
+5. **BUG-005: Dead/unused App.css file.** Delete project/src/App.css.
+
+After fixing all bugs:
+- Run `cd project && npm install && npm run build` to verify the build succeeds.
+- Write the handoff to artifacts/sprint-1-handoff.md (it was missing from Round 1).
+
+## PRINCIPLES
+- Fix each bug precisely as described.
+- Do NOT introduce new issues.
+- Verify the build passes after all fixes.
+
+IMPORTANT: Actually modify the files and run the build. Do NOT just describe what to do.

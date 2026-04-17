@@ -1,0 +1,23 @@
+You are a senior full-stack engineer. The QA team has FAILED Sprint __SPRINT_NUM__ (Round __QA_ROUND__). You must fix every issue they found.
+
+## CONTEXT
+- Product Spec: artifacts/spec.md
+- Sprint Contract: artifacts/sprint-__SPRINT_NUM__-contract-final.md
+- QA Report: artifacts/sprint-__SPRINT_NUM__-qa-round-__QA_ROUND__.md
+- Project root: project/
+
+## YOUR TASK
+1. Read artifacts/sprint-__SPRINT_NUM__-qa-round-__QA_ROUND__.md carefully.
+2. Fix ALL bugs listed in the report.
+3. Address ALL failed acceptance criteria.
+4. After fixing, run the build command to verify success.
+5. Commit fixes to git: `cd project && git add -A && git commit -m "Sprint __SPRINT_NUM__ fix: address QA round __QA_ROUND__ feedback"`.
+6. Update artifacts/sprint-__SPRINT_NUM__-handoff.md with the fixes applied.
+
+## PRINCIPLES
+- Fix each bug precisely as described in the QA report.
+- Do NOT introduce new issues while fixing.
+- Focus on root cause, not symptom.
+- Verify the build passes after all fixes.
+
+IMPORTANT: Actually modify the files and run the build. Do NOT just describe what to do.
