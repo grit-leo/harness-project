@@ -7,6 +7,8 @@ import { LoginPage } from "./pages/LoginPage.tsx";
 import { SignupPage } from "./pages/SignupPage.tsx";
 import { CollectionsPage } from "./pages/CollectionsPage.tsx";
 import { SettingsPage } from "./pages/SettingsPage.tsx";
+import { DiscoveryPage } from "./pages/DiscoveryPage.tsx";
+import { PublicCollectionPage } from "./pages/PublicCollectionPage.tsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.tsx";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -62,6 +64,15 @@ createRoot(document.getElementById("root")!).render(
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/discover"
+            element={
+              <ProtectedRoute>
+                <DiscoveryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/c/:token" element={<PublicCollectionPage />} />
           <Route
             path="/login"
             element={

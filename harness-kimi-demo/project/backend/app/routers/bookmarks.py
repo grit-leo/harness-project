@@ -7,6 +7,8 @@ from app.core.deps import get_current_user
 from app.models.user import User
 from app.models.bookmark import Bookmark
 from app.models.tag import Tag
+from app.models.collection import Collection
+from app.models.collection_collaborator import CollectionCollaborator
 from app.schemas.bookmark import (
     BookmarkCreate,
     BookmarkUpdate,
@@ -18,6 +20,7 @@ from app.services import ai_service
 from app.services.netscape_parser import parse_netscape_html
 from app.services.netscape_exporter import bookmarks_to_netscape_html
 from app.services.import_task import create_task, run_import_task, get_task
+from app.services.digest_service import generate_digest_items
 import json
 
 router = APIRouter(prefix="/api/bookmarks", tags=["bookmarks"])
@@ -37,6 +40,29 @@ def ensure_tags(db: Session, user: User, tag_names: List[str]) -> List[Tag]:
         tags.append(tag)
     db.commit()
     return tags
+
+
+def _can_mutate_bookmark(db: Session, bookmark: Bookmark, user: User) -> bool:
+    if bookmark.user_id == user.id:
+        return True
+    # Check if user is a collaborator on any shared-edit collection of the owner
+    # and if the bookmark matches that collection's rules
+    from app.routers.collections import _evaluate_collection
+    collabs = (
+        db.query(CollectionCollaborator, Collection)
+        .join(Collection, CollectionCollaborator.collection_id == Collection.id)
+        .filter(
+            CollectionCollaborator.user_id == user.id,
+            Collection.user_id == bookmark.user_id,
+            Collection.visibility == "shared_edit",
+        )
+        .all()
+    )
+    for _, collection in collabs:
+        matches = _evaluate_collection([bookmark], collection.rules_json or {})
+        if matches:
+            return True
+    return False
 
 
 @router.get("", response_model=List[BookmarkOut])
@@ -86,6 +112,8 @@ def create_bookmark(
     db.commit()
     db.refresh(bookmark)
     background_tasks.add_task(ai_service.enrich_bookmark, str(bookmark.id), str(bookmark.url))
+    # Generate digest items for followers
+    generate_digest_items(db, current_user.id, bookmark.id)
     return bookmark
 
 
@@ -147,9 +175,11 @@ def update_bookmark(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    bookmark = db.query(Bookmark).filter(Bookmark.id == bookmark_id, Bookmark.user_id == current_user.id).first()
+    bookmark = db.query(Bookmark).filter(Bookmark.id == bookmark_id).first()
     if not bookmark:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bookmark not found")
+    if not _can_mutate_bookmark(db, bookmark, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this bookmark")
 
     if payload.url is not None:
         bookmark.url = str(payload.url)
@@ -158,7 +188,9 @@ def update_bookmark(
     if payload.summary is not None:
         bookmark.summary = payload.summary
     if payload.tags is not None:
-        bookmark.tags = ensure_tags(db, current_user, payload.tags)
+        # Ensure tags belong to the bookmark owner
+        owner = db.query(User).filter(User.id == bookmark.user_id).first()
+        bookmark.tags = ensure_tags(db, owner, payload.tags)
 
     db.commit()
     db.refresh(bookmark)
@@ -171,9 +203,11 @@ def delete_bookmark(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    bookmark = db.query(Bookmark).filter(Bookmark.id == bookmark_id, Bookmark.user_id == current_user.id).first()
+    bookmark = db.query(Bookmark).filter(Bookmark.id == bookmark_id).first()
     if not bookmark:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bookmark not found")
+    if not _can_mutate_bookmark(db, bookmark, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this bookmark")
     db.delete(bookmark)
     db.commit()
     return None
@@ -217,6 +251,7 @@ def import_bookmarks(
                 db.commit()
                 db.refresh(bookmark)
                 imported_ids.append(bookmark.id)
+                generate_digest_items(db, current_user.id, bookmark.id)
             except Exception:
                 db.rollback()
         return {"imported": len(imported_ids), "bookmark_ids": imported_ids}

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BookmarkCard } from "./components/BookmarkCard";
 import { FilterBar } from "./components/FilterBar";
 import { BookmarkModal } from "./components/BookmarkModal";
+import { DigestPopover } from "./components/DigestPopover";
 import { useBookmarkFilter } from "./hooks/useBookmarkFilter";
 import { useAuth } from "./context/AuthContext";
 import { Link } from "react-router-dom";
@@ -172,6 +173,12 @@ function App() {
               GitHub
             </a>
             <Link
+              to="/discover"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+            >
+              Discover
+            </Link>
+            <Link
               to="/collections"
               className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
             >
@@ -189,6 +196,7 @@ function App() {
             >
               Add bookmark
             </button>
+            <DigestPopover />
             <button
               onClick={logout}
               className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"

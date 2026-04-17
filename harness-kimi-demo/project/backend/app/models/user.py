@@ -17,3 +17,4 @@ class User(Base):
     bookmarks = relationship("Bookmark", back_populates="user", cascade="all, delete-orphan")
     tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan")
     collections = relationship("Collection", back_populates="user", cascade="all, delete-orphan")
+    collaborator_roles = relationship("CollectionCollaborator", back_populates="user", cascade="all, delete-orphan")

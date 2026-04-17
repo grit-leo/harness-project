@@ -39,8 +39,52 @@ export interface Collection {
   name: string;
   rules: Rules;
   isDefault: boolean;
+  visibility: "private" | "public_readonly" | "shared_edit";
+  shareToken: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Collaborator {
+  userId: string;
+  email: string;
+  role: string;
+}
+
+export interface PublicCollection {
+  id: string;
+  name: string;
+  rules: Rules;
+  ownerEmail: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DiscoveryItem {
+  id: string;
+  name: string;
+  ownerEmail: string;
+  followerCount: number;
+  tagOverlap: string[];
+  shareToken: string;
+}
+
+export interface Follow {
+  id: string;
+  followerId: string;
+  followingUserId: string | null;
+  followingCollectionId: string | null;
+  createdAt: string;
+}
+
+export interface DigestItem {
+  id: string;
+  userId: string;
+  sourceUserId: string | null;
+  sourceCollectionId: string | null;
+  bookmarkId: string;
+  seen: boolean;
+  createdAt: string;
 }
 
 export interface AuthTokens {
@@ -251,6 +295,18 @@ export async function createCollection(payload: {
   return res.json();
 }
 
+export async function updateCollection(
+  id: string,
+  payload: { name?: string; rules?: Rules; visibility?: string }
+): Promise<Collection> {
+  const res = await apiFetch(`/api/collections/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("Failed to update collection");
+  return res.json();
+}
+
 export async function fetchCollectionBookmarks(id: string): Promise<Bookmark[]> {
   const res = await apiFetch(`/api/collections/${id}/bookmarks`);
   if (!res.ok) throw new Error("Failed to fetch collection bookmarks");
@@ -262,6 +318,92 @@ export async function deleteCollection(id: string): Promise<void> {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete collection");
+}
+
+export async function shareCollection(id: string): Promise<{ share_token: string; public_url: string }> {
+  const res = await apiFetch(`/api/collections/${id}/share`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to share collection");
+  return res.json();
+}
+
+export async function unshareCollection(id: string): Promise<void> {
+  const res = await apiFetch(`/api/collections/${id}/share`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to unshare collection");
+}
+
+export async function fetchCollaborators(id: string): Promise<Collaborator[]> {
+  const res = await apiFetch(`/api/collections/${id}/collaborators`);
+  if (!res.ok) throw new Error("Failed to fetch collaborators");
+  return res.json();
+}
+
+export async function inviteCollaborator(id: string, email: string): Promise<Collaborator> {
+  const res = await apiFetch(`/api/collections/${id}/collaborators`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw new Error("Failed to invite collaborator");
+  return res.json();
+}
+
+export async function removeCollaborator(id: string, userId: string): Promise<void> {
+  const res = await apiFetch(`/api/collections/${id}/collaborators/${userId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to remove collaborator");
+}
+
+export async function fetchPublicCollection(token: string): Promise<PublicCollection> {
+  const res = await fetch(`${API_BASE_URL}/api/public/collections/${token}`);
+  if (!res.ok) throw new Error("Failed to fetch public collection");
+  return res.json();
+}
+
+export async function fetchPublicCollectionBookmarks(token: string): Promise<Bookmark[]> {
+  const res = await fetch(`${API_BASE_URL}/api/public/collections/${token}/bookmarks`);
+  if (!res.ok) throw new Error("Failed to fetch public collection bookmarks");
+  return res.json();
+}
+
+export async function followPublicCollection(token: string): Promise<void> {
+  const res = await apiFetch(`/api/public/collections/${token}/follow`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to follow collection");
+}
+
+export async function fetchDiscovery(): Promise<DiscoveryItem[]> {
+  const res = await apiFetch("/api/discover");
+  if (!res.ok) throw new Error("Failed to fetch discovery");
+  return res.json();
+}
+
+export async function followUser(userId: string): Promise<void> {
+  const res = await apiFetch(`/api/users/${userId}/follow`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to follow user");
+}
+
+export async function unfollowUser(userId: string): Promise<void> {
+  const res = await apiFetch(`/api/users/${userId}/follow`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to unfollow user");
+}
+
+export async function fetchFollows(): Promise<Follow[]> {
+  const res = await apiFetch("/api/follows");
+  if (!res.ok) throw new Error("Failed to fetch follows");
+  return res.json();
+}
+
+export async function fetchDigest(): Promise<DigestItem[]> {
+  const res = await apiFetch("/api/digest");
+  if (!res.ok) throw new Error("Failed to fetch digest");
+  return res.json();
+}
+
+export async function markDigestSeen(ids?: string[]): Promise<void> {
+  const res = await apiFetch("/api/digest/mark-seen", {
+    method: "POST",
+    body: JSON.stringify(ids ? { ids } : {}),
+  });
+  if (!res.ok) throw new Error("Failed to mark digest seen");
 }
 
 export interface ImportStatus {

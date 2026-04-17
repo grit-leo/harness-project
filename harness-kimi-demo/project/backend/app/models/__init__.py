@@ -4,3 +4,6 @@ from app.models.bookmark import Bookmark
 from app.models.tag import Tag
 from app.models.ai_cache import AICache
 from app.models.collection import Collection
+from app.models.collection_collaborator import CollectionCollaborator
+from app.models.follow import Follow
+from app.models.digest_item import DigestItem

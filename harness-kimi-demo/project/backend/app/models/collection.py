@@ -14,7 +14,10 @@ class Collection(Base):
     name = Column(String(128), nullable=False)
     rules_json = Column(JSON, nullable=False, default=dict)
     is_default = Column(Boolean, default=False, nullable=False)
+    visibility = Column(String(20), default="private", nullable=False)
+    share_token = Column(String(64), nullable=True, unique=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     user = relationship("User", back_populates="collections")
+    collaborators = relationship("CollectionCollaborator", back_populates="collection", cascade="all, delete-orphan")

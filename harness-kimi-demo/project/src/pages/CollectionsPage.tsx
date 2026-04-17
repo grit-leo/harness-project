@@ -7,11 +7,18 @@ import {
   fetchCollectionBookmarks,
   createCollection,
   deleteCollection,
+  updateCollection,
   createBookmark,
+  shareCollection,
+  unshareCollection,
+  fetchCollaborators,
+  inviteCollaborator,
+  removeCollaborator,
   type Collection,
   type Bookmark,
   type Condition,
   type BookmarkCreate,
+  type Collaborator,
 } from "../api/client";
 
 export function CollectionsPage() {
@@ -29,6 +36,14 @@ export function CollectionsPage() {
     { field: "tag", op: "equals", value: "" },
   ]);
   const [modalOpen, setModalOpen] = useState(false);
+
+  // Collaborator state
+  const [collabPanelOpen, setCollabPanelOpen] = useState(false);
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+
+  // Live indicator
+  const [live, setLive] = useState(false);
 
   const loadCollections = async () => {
     try {
@@ -60,12 +75,30 @@ export function CollectionsPage() {
       }
     };
     load();
-    const interval = setInterval(load, 5000);
+    const interval = setInterval(load, 3000);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
   }, [selectedId]);
+
+  useEffect(() => {
+    const selected = collections.find((c) => c.id === selectedId);
+    setLive(selected?.visibility === "shared_edit" || false);
+  }, [selectedId, collections]);
+
+  useEffect(() => {
+    if (!selectedId || !collabPanelOpen) return;
+    const load = async () => {
+      try {
+        const data = await fetchCollaborators(selectedId);
+        setCollaborators(data);
+      } catch (err: any) {
+        setError(err.message || "Failed to load collaborators");
+      }
+    };
+    load();
+  }, [selectedId, collabPanelOpen]);
 
   const selectedCollection = collections.find((c) => c.id === selectedId);
 
@@ -104,6 +137,70 @@ export function CollectionsPage() {
       }
     } catch (err: any) {
       setError(err.message || "Failed to delete collection");
+    }
+  };
+
+  const handleVisibilityChange = async (visibility: string) => {
+    if (!selectedCollection) return;
+    try {
+      const updated = await updateCollection(selectedCollection.id, { visibility });
+      setCollections((prev) =>
+        prev.map((c) => (c.id === updated.id ? updated : c))
+      );
+    } catch (err: any) {
+      setError(err.message || "Failed to update visibility");
+    }
+  };
+
+  const handleShare = async () => {
+    if (!selectedCollection) return;
+    try {
+      const result = await shareCollection(selectedCollection.id);
+      setCollections((prev) =>
+        prev.map((c) =>
+          c.id === selectedCollection.id ? { ...c, shareToken: result.share_token } : c
+        )
+      );
+    } catch (err: any) {
+      setError(err.message || "Failed to share collection");
+    }
+  };
+
+  const handleUnshare = async () => {
+    if (!selectedCollection) return;
+    try {
+      await unshareCollection(selectedCollection.id);
+      setCollections((prev) =>
+        prev.map((c) =>
+          c.id === selectedCollection.id ? { ...c, shareToken: null } : c
+        )
+      );
+    } catch (err: any) {
+      setError(err.message || "Failed to revoke share link");
+    }
+  };
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedId || !inviteEmail.trim()) return;
+    try {
+      await inviteCollaborator(selectedId, inviteEmail.trim());
+      setInviteEmail("");
+      const data = await fetchCollaborators(selectedId);
+      setCollaborators(data);
+    } catch (err: any) {
+      setError(err.message || "Failed to invite collaborator");
+    }
+  };
+
+  const handleRemoveCollaborator = async (userId: string) => {
+    if (!selectedId) return;
+    if (!confirm("Remove this collaborator?")) return;
+    try {
+      await removeCollaborator(selectedId, userId);
+      setCollaborators((prev) => prev.filter((c) => c.userId !== userId));
+    } catch (err: any) {
+      setError(err.message || "Failed to remove collaborator");
     }
   };
 
@@ -147,6 +244,12 @@ export function CollectionsPage() {
               className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
             >
               Library
+            </Link>
+            <Link
+              to="/discover"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+            >
+              Discover
             </Link>
             <Link
               to="/settings"
@@ -235,17 +338,124 @@ export function CollectionsPage() {
             <section className="flex-1">
               {selectedCollection ? (
                 <>
-                  <div className="mb-4 flex items-center justify-between">
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <h2 className="text-lg font-semibold text-slate-100">
-                        {selectedCollection.name}
-                      </h2>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-semibold text-slate-100">
+                          {selectedCollection.name}
+                        </h2>
+                        {live && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                            </span>
+                            Live
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500">
                         {bookmarks.length} bookmark
                         {bookmarks.length === 1 ? "" : "s"}
                       </p>
                     </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={selectedCollection.visibility}
+                        onChange={(e) => handleVisibilityChange(e.target.value)}
+                        className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-500"
+                      >
+                        <option value="private">Private</option>
+                        <option value="public_readonly">Public read-only</option>
+                        <option value="shared_edit">Shared edit</option>
+                      </select>
+                      {selectedCollection.visibility === "public_readonly" && (
+                        <>
+                          {selectedCollection.shareToken ? (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(
+                                    `${window.location.origin}/c/${selectedCollection.shareToken}`
+                                  );
+                                }}
+                                className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700"
+                                title="Copy public link"
+                              >
+                                Copy public link
+                              </button>
+                              <button
+                                onClick={handleUnshare}
+                                className="rounded-lg bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20"
+                              >
+                                Revoke link
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={handleShare}
+                              className="rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-600"
+                            >
+                              Generate share link
+                            </button>
+                          )}
+                        </>
+                      )}
+                      <button
+                        onClick={() => setCollabPanelOpen((v) => !v)}
+                        className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700"
+                      >
+                        Collaborators
+                      </button>
+                    </div>
                   </div>
+
+                  {collabPanelOpen && (
+                    <div className="mb-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                      <h3 className="mb-2 text-sm font-semibold text-slate-200">
+                        Collaborators
+                      </h3>
+                      <form onSubmit={handleInvite} className="mb-3 flex gap-2">
+                        <input
+                          type="email"
+                          required
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                          placeholder="collaborator@example.com"
+                          className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500"
+                        />
+                        <button
+                          type="submit"
+                          className="rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-600"
+                        >
+                          Invite
+                        </button>
+                      </form>
+                      {collaborators.length === 0 ? (
+                        <p className="text-xs text-slate-500">No collaborators yet.</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {collaborators.map((c) => (
+                            <li
+                              key={c.userId}
+                              className="flex items-center justify-between rounded-lg bg-slate-950/50 px-3 py-2"
+                            >
+                              <div>
+                                <p className="text-xs text-slate-300">{c.email}</p>
+                                <p className="text-[10px] text-slate-500">{c.role}</p>
+                              </div>
+                              <button
+                                onClick={() => handleRemoveCollaborator(c.userId)}
+                                className="text-xs text-red-400 hover:text-red-300"
+                              >
+                                Remove
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
 
                   {bookmarks.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 py-16 text-center">
