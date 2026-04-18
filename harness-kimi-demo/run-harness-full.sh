@@ -15,6 +15,7 @@
 #    ./run-harness-full.sh "Build a ..."          # fresh run
 #    ./run-harness-full.sh --resume                # resume from saved state
 #    MAX_QA_ROUNDS=5 ./run-harness-full.sh "..."   # custom QA rounds
+#    STRICT_MODE=true ./run-harness-full.sh "..."  # halt on Sprint FAIL
 # ═══════════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -26,6 +27,7 @@ source "${ROOT}/lib/state.sh"
 source "${ROOT}/lib/parse-sprints.sh"
 source "${ROOT}/lib/check-verdict.sh"
 source "${ROOT}/lib/render-prompt.sh"
+source "${ROOT}/lib/restart-servers.sh"
 
 # ── Configuration (override via env) ─────────────────────────────
 # If set before resume, overrides harness-state.json (same for MAX_QA_ROUNDS)
@@ -33,6 +35,7 @@ USER_MAX_QA="${MAX_QA_ROUNDS:-}"
 MAX_QA_ROUNDS="${MAX_QA_ROUNDS:-3}"
 START_FROM_SPRINT="${START_FROM_SPRINT:-1}"
 KIMI_EXTRA_ARGS="${KIMI_EXTRA_ARGS:-}"
+STRICT_MODE="${STRICT_MODE:-false}"
 HARNESS_START_TIME="$(date +%s)"
 
 # ── Ensure directories ───────────────────────────────────────────
@@ -97,6 +100,7 @@ if $RESUME && state_exists; then
   echo "  Goal:          $USER_GOAL"
   echo "  Resume sprint: $START_FROM_SPRINT"
   echo "  Max QA rounds: $MAX_QA_ROUNDS"
+  echo "  Strict mode:   $STRICT_MODE"
 else
   if [[ -z "$USER_GOAL" ]]; then
     USER_GOAL="Build a personal bookmark manager with tagging, full-text search, and a clean modern UI."
@@ -109,6 +113,7 @@ else
   echo "═══════════════════════════════════════════════════════════"
   echo "  Goal:          $USER_GOAL"
   echo "  Max QA rounds: $MAX_QA_ROUNDS"
+  echo "  Strict mode:   $STRICT_MODE"
   echo "  State file:    artifacts/harness-state.json"
   echo "═══════════════════════════════════════════════════════════"
 fi
@@ -200,12 +205,16 @@ for (( sprint=START_FROM_SPRINT; sprint<=TOTAL_SPRINTS; sprint++ )); do
 
   # ── 2c. QA Loop ─────────────────────────────────────────────
   PASSED=false
-  for (( qa_round=1; qa_round<=MAX_QA_ROUNDS; qa_round++ )); do
+  EFFECTIVE_MAX_QA="$MAX_QA_ROUNDS"
+  for (( qa_round=1; qa_round<=EFFECTIVE_MAX_QA; qa_round++ )); do
     state_set qa_round "$qa_round"
     QA_REPORT="artifacts/sprint-${sprint}-qa-round-${qa_round}.md"
 
+    # Restart backend so Evaluator tests the latest code
+    restart_backend
+
     # Evaluator
-    log_phase "SPRINT ${sprint} — QA ROUND ${qa_round}/${MAX_QA_ROUNDS}" "Evaluating..."
+    log_phase "SPRINT ${sprint} — QA ROUND ${qa_round}/${EFFECTIVE_MAX_QA}" "Evaluating..."
     state_set phase "qa"
 
     prompt="$(render_evaluator_prompt "$sprint" "$qa_round")"
@@ -226,7 +235,16 @@ for (( sprint=START_FROM_SPRINT; sprint<=TOTAL_SPRINTS; sprint++ )); do
       echo ""
       echo "  ✗ Sprint ${sprint} FAILED QA round ${qa_round}"
 
-      if (( qa_round < MAX_QA_ROUNDS )); then
+      # Overtime: if at max rounds but <=2 bugs remain, grant one extra round
+      if (( qa_round == EFFECTIVE_MAX_QA && EFFECTIVE_MAX_QA == MAX_QA_ROUNDS )); then
+        remaining="$(count_bugs_in_report "$QA_REPORT")"
+        if (( remaining > 0 && remaining <= 2 )); then
+          EFFECTIVE_MAX_QA=$(( EFFECTIVE_MAX_QA + 1 ))
+          echo "  ⏱ Overtime: only ${remaining} bug(s) left — granting 1 extra round."
+        fi
+      fi
+
+      if (( qa_round < EFFECTIVE_MAX_QA )); then
         # Generator Fix
         log_phase "SPRINT ${sprint} — FIX (Round ${qa_round})" "Fixing QA issues..."
         state_set phase "qa_fix"
@@ -242,9 +260,16 @@ for (( sprint=START_FROM_SPRINT; sprint<=TOTAL_SPRINTS; sprint++ )); do
 
   if ! $PASSED; then
     echo ""
-    echo "  ⚠ Sprint ${sprint} did not pass after ${MAX_QA_ROUNDS} QA rounds."
-    echo "    Continuing to next sprint. You can re-run with:"
-    echo "    START_FROM_SPRINT=${sprint} ./run-harness-full.sh --resume"
+    echo "  ⚠ Sprint ${sprint} did not pass after ${EFFECTIVE_MAX_QA} QA rounds."
+    if [[ "$STRICT_MODE" == "true" ]]; then
+      echo "  STRICT MODE: Halting harness. Fix Sprint ${sprint} before proceeding."
+      echo "    Resume with: START_FROM_SPRINT=${sprint} $0 --resume"
+      state_set phase "blocked"
+      exit 1
+    else
+      echo "    Continuing to next sprint. You can re-run with:"
+      echo "    START_FROM_SPRINT=${sprint} ./run-harness-full.sh --resume"
+    fi
   fi
 
   # ── Git tag for sprint ──────────────────────────────────────

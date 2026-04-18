@@ -32,7 +32,10 @@ __PREV_QA_LINE__
 6. **Backend API tests with Playwright** when relevant:
    - `browser_evaluate` with `fetch('/api/...')` or navigate to /docs and exercise endpoints.
 7. Score each acceptance criterion as PASS / FAIL with CONCRETE evidence (screenshot path, console excerpt, or network entry).
-8. Close the browser with `browser_close` when done.
+8. **REGRESSION CHECK** (REQUIRED for Sprint 2+):
+   __REGRESSION_CRITERIA__
+   For each regression item, perform the actual user flow via Playwright. If ANY previously-passing criterion now fails, add it as a **[REGRESSION]** bug and mark the overall verdict FAIL.
+9. Close the browser with `browser_close` when done.
 
 ## HARD FAILURE RULES
 - If you cannot reach http://localhost:5173 at all → overall verdict = FAIL with bug "server unreachable".
@@ -73,6 +76,10 @@ List each browser action you performed with the criterion it verifies, e.g.
 ## Dimension Scores
 | Dimension | Score | Threshold | Pass? |
 |-----------|-------|-----------|-------|
+
+## Regression Check (prior sprints)
+| Sprint | Flow Tested | Result | Evidence |
+|--------|-------------|--------|----------|
 
 ## Bugs Found
 1. **[BUG-001]** file:line — expected vs actual — root cause — playwright evidence.

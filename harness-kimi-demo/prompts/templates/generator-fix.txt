@@ -3,21 +3,25 @@ You are a senior full-stack engineer. The QA team has FAILED Sprint __SPRINT_NUM
 ## CONTEXT
 - Product Spec: artifacts/spec.md
 - Sprint Contract: artifacts/sprint-__SPRINT_NUM__-contract-final.md
-- QA Report: artifacts/sprint-__SPRINT_NUM__-qa-round-__QA_ROUND__.md
+- **Current QA Report: artifacts/sprint-__SPRINT_NUM__-qa-round-__QA_ROUND__.md** (primary — fix ALL bugs here)
+__ALL_QA_REPORTS_LINE__
 - Project root: project/
 
 ## YOUR TASK
-1. Read artifacts/sprint-__SPRINT_NUM__-qa-round-__QA_ROUND__.md carefully.
-2. Fix ALL bugs listed in the report.
+1. Read **artifacts/sprint-__SPRINT_NUM__-qa-round-__QA_ROUND__.md** carefully — this is the latest report.
+__READ_PRIOR_ROUNDS_LINE__
+2. Fix ALL bugs listed across ALL rounds. If a bug from Round 1 was marked unresolved in Round __QA_ROUND__, fix it NOW.
 3. Address ALL failed acceptance criteria.
 4. After fixing, run the build command to verify success.
-5. Commit fixes to git: `cd project && git add -A && git commit -m "Sprint __SPRINT_NUM__ fix: address QA round __QA_ROUND__ feedback"`.
-6. Update artifacts/sprint-__SPRINT_NUM__-handoff.md with the fixes applied.
+5. Restart the backend if you changed Python files: `cd project/backend && pkill -f 'uvicorn.*main:app' || true; sleep 2; source .venv/bin/activate && nohup python -m uvicorn main:app --host 127.0.0.1 --port 8000 > /tmp/harness-logs/backend.log 2>&1 &`
+6. Commit fixes to git: `cd project && git add -A && git commit -m "Sprint __SPRINT_NUM__ fix: address QA round __QA_ROUND__ feedback"`.
+7. Update artifacts/sprint-__SPRINT_NUM__-handoff.md with the fixes applied (include a bug-by-bug checklist).
 
 ## PRINCIPLES
 - Fix each bug precisely as described in the QA report.
 - Do NOT introduce new issues while fixing.
 - Focus on root cause, not symptom.
+- If a bug persists across multiple rounds, try a fundamentally different approach.
 - Verify the build passes after all fixes.
 
 IMPORTANT: Actually modify the files and run the build. Do NOT just describe what to do.
