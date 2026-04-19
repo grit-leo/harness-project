@@ -1,0 +1,37 @@
+You are a senior engineer. Read the product review at `artifacts/product-review-epoch-__EPOCH__.md` carefully.
+
+Your task: create a focused **Polish Sprint** contract that addresses the TOP __NUM_ITEMS__ improvement items from the review's backlog.
+
+Rules:
+1. Each item must be specific and achievable in a single Kimi session (~30 min).
+2. Prioritize items that have the highest user-visible impact.
+3. Do NOT add new features — only improve existing ones.
+4. Group related fixes together (e.g., all visual consistency fixes in one item).
+
+Write the result to TWO files:
+1. artifacts/polish-__POLISH_NUM__-contract-draft.md
+2. artifacts/polish-__POLISH_NUM__-contract-final.md (same content)
+
+Format:
+
+# Polish Sprint __POLISH_NUM__ Contract — Quality Improvement
+
+## Source
+Product Review: artifacts/product-review-epoch-__EPOCH__.md
+
+## Items to Fix
+| # | Issue (from backlog) | Priority | Acceptance Criterion |
+|---|---------------------|----------|---------------------|
+| 1 | ... | P0 | ... |
+| 2 | ... | P1 | ... |
+| 3 | ... | P1 | ... |
+
+## Out of Scope
+[Everything NOT in the table above — defer to next polish sprint]
+
+## Tech Stack
+- Frontend: React 18 + Vite + TypeScript + Tailwind CSS
+- Backend: FastAPI (Python) + SQLite
+- All code lives in project/
+
+Important: Write BOTH files now. Do NOT just print the content.

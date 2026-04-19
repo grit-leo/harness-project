@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login } from "../api/client";
+import { useAuth } from "../context/AuthContext";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -8,6 +9,7 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { checkAuth } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -15,6 +17,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
+      await checkAuth();
       navigate("/");
     } catch (err: any) {
       setError(err.message || "Login failed");

@@ -3,15 +3,16 @@ import {
   useContext,
   useEffect,
   useState,
+  useCallback,
   type ReactNode,
 } from "react";
-import { getAccessToken, clearTokens } from "../api/client";
+import { getAccessToken, clearTokens, refreshAccessToken } from "../api/client";
 
 interface AuthContextValue {
   isAuthenticated: boolean;
   loading: boolean;
   logout: () => void;
-  checkAuth: () => void;
+  checkAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -30,24 +31,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const checkAuth = () => {
+  const checkAuth = useCallback(async () => {
     const token = getAccessToken();
-    const valid = !!token && !isTokenExpired(token);
-    setIsAuthenticated(valid);
-    if (!valid) {
-      clearTokens();
+    if (!token) {
+      setIsAuthenticated(false);
+      setLoading(false);
+      return;
     }
+    if (!isTokenExpired(token)) {
+      setIsAuthenticated(true);
+      setLoading(false);
+      return;
+    }
+    // Access token expired — try silent refresh
+    const refreshed = await refreshAccessToken();
+    setIsAuthenticated(refreshed);
     setLoading(false);
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     clearTokens();
     setIsAuthenticated(false);
-  };
+  }, []);
 
   useEffect(() => {
     checkAuth();
-  }, []);
+  }, [checkAuth]);
 
   return (
     <AuthContext.Provider

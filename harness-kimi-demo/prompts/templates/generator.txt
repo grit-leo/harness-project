@@ -8,6 +8,8 @@ __QA_FEEDBACK_LINE__
 
 __UNRESOLVED_BUGS__
 
+__VISUAL_CONTEXT__
+
 ## TECH STACK
 - Frontend: React 18 + Vite + TypeScript + Tailwind CSS
 - Backend: FastAPI (Python) + SQLite (add only when the sprint contract requires it)

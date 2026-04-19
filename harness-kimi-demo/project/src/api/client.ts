@@ -6,7 +6,7 @@ export interface Bookmark {
   url: string;
   tags: string[];
   summary: string;
-  suggestedTags: string[];
+  suggestedTags?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -120,7 +120,7 @@ export function getRefreshToken(): string | null {
   return refreshTokenValue;
 }
 
-async function refreshAccessToken(): Promise<boolean> {
+export async function refreshAccessToken(): Promise<boolean> {
   const rt = refreshTokenValue;
   if (!rt) return false;
   try {
@@ -222,7 +222,8 @@ export async function fetchBookmarks(
   const params = new URLSearchParams();
   if (search) params.set("search", search);
   tags?.forEach((t) => params.append("tag", t));
-  const res = await apiFetch(`/api/bookmarks?${params.toString()}`);
+  const query = params.toString();
+  const res = await apiFetch(`/api/bookmarks${query ? `?${query}` : ""}`);
   if (!res.ok) throw new Error("Failed to fetch bookmarks");
   return res.json();
 }

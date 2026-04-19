@@ -42,6 +42,17 @@
 - [12. 实战效果参考](#12-实战效果参考)
 - [13. 实施 Checklist](#13-实施-checklist)
 - [14. 关键落地建议](#14-关键落地建议)
+- [15. Multi-Epoch Evolution 架构（V2 升级）](#15-multi-epoch-evolution-架构v2-升级)
+  - [15.1 问题诊断：为什么 V1 产品不够惊艳](#151-问题诊断为什么-v1-产品不够惊艳)
+  - [15.2 解决方案：Multi-Epoch 循环](#152-解决方案multi-epoch-循环)
+  - [15.3 新增 Agent：Product Reviewer](#153-新增-agentproduct-reviewer)
+  - [15.4 新增 Agent：Polish Generator](#154-新增-agentpolish-generator)
+  - [15.5 Quality Gate 机制](#155-quality-gate-机制)
+  - [15.6 Evolution 目标队列](#156-evolution-目标队列)
+  - [15.7 Planner 约束优化](#157-planner-约束优化)
+  - [15.8 Visual Context 注入](#158-visual-context-注入)
+  - [15.9 完整文件清单与使用方式](#159-完整文件清单与使用方式)
+  - [15.10 配置参数参考](#1510-配置参数参考)
 
 ---
 
@@ -2142,6 +2153,310 @@ Evaluator 的核心价值在于像真实用户一样操作：通过 Playwright M
 
 ---
 
+## 15. Multi-Epoch Evolution 架构（V2 升级）
+
+> 更新日期：2026-04-19
+>
+> V1 的 Harness 是 **"一次性构建管线"**：Planner → Sprint 1..N → Done。V2 将其升级为 **"多轮进化管线"**，通过 Build → Review → Polish → Evolve 的循环持续提升产品质量。
+
+### 15.1 问题诊断：为什么 V1 产品不够惊艳
+
+经过多次实际运行，V1 架构暴露出五个系统性瓶颈：
+
+| # | 问题 | 根因 | 影响 |
+|---|------|------|------|
+| 1 | **跑完即停，没有改进循环** | Harness 在所有 Sprint 完成后直接退出 | 产品停留在 "能用" 而非 "好用" |
+| 2 | **Spec 贪心：广度有余深度不足** | Planner 倾向生成 5+ Sprint、15+ Feature | 每个功能都有但都不精 |
+| 3 | **QA 只验合同，不评产品品质** | Evaluator 只检查 Acceptance Criteria 勾选 | "PASS" ≠ "产品体验好" |
+| 4 | **没有打磨环节** | 所有 Sprint 都在加新功能 | 无人关注 UX 一致性、视觉细节、边界处理 |
+| 5 | **Generator 缺乏视觉全局观** | Generator 只看文字描述，不知道 App 长啥样 | 新代码可能破坏已有视觉风格 |
+
+核心洞察：**产品质量不是一次构建出来的，而是通过 "构建 → 审视 → 打磨 → 演化" 的循环逐步提升的。**
+
+### 15.2 解决方案：Multi-Epoch 循环
+
+V2 将 Harness 生命周期从线性改为循环：
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                    Evolution Loop (Epoch 循环)                 │
+│                                                               │
+│  Epoch 1: Foundation Build                                    │
+│      Planner → 3 core Sprints → QA loops                     │
+│      └─→ 产出：可运行的基础产品                                 │
+│                                                               │
+│  Epoch 2: Product Review (新增)                                │
+│      Product Reviewer Agent 全站巡检                           │
+│      └─→ 产出：10 维度评分 + 优先级改进清单                     │
+│                                                               │
+│  Epoch 3: Polish Sprints (新增)                                │
+│      从改进清单生成微型打磨 Sprint                              │
+│      └─→ 每轮 re-review，循环直到质量分 ≥ 阈值                 │
+│                                                               │
+│  Epoch 4+: Evolution (新增，可持续)                             │
+│      从 goal_queue 取新需求 → 增量 Sprint                      │
+│      └─→ 回到 Build → Review → Polish 循环                    │
+│                                                               │
+│  ∞ Loop until: 目标队列为空 AND 质量分达标                      │
+└───────────────────────────────────────────────────────────────┘
+```
+
+与 V1 的关键区别：
+
+| 维度 | V1 | V2 |
+|------|----|----|
+| 生命周期 | 线性：Plan → Build → Done | 循环：Build → Review → Polish → Evolve |
+| Sprint 数 | 5-8 个（Planner 决定） | 3 个核心 + 按需扩展 |
+| 质量评估 | 只有 Sprint 级 QA | Sprint QA + 全站 Product Review |
+| 打磨机制 | 无 | 自动 Polish Sprint 循环 |
+| 演化能力 | 无 | 目标队列 + 增量 Sprint |
+| 终止条件 | Sprint 全部完成 | 质量达标 + 队列为空 |
+
+### 15.3 新增 Agent：Product Reviewer
+
+**角色定位**：不同于 Evaluator（检查合同条款），Reviewer 从 **真实用户视角** 评估整体产品体验。
+
+**核心能力**：
+
+1. **全站巡检**：通过 Playwright MCP 访问每一个路由/页面，不遗漏
+2. **核心旅程测试**：从 Spec 中提取 5 条最重要的用户旅程，端到端验证
+3. **10 维度评分**：
+
+| # | 维度 | 说明 |
+|---|------|------|
+| 1 | Visual Polish | 颜色一致性、间距、字体、暗色模式、无未样式化元素 |
+| 2 | UX Flow | 直觉导航、清晰 CTA、加载态、错误反馈 |
+| 3 | Feature Completeness | 所有承诺的功能是否端到端可用 |
+| 4 | Responsiveness | 移动/平板/桌面布局、无溢出、触控友好 |
+| 5 | Error Handling | 错误输入、网络异常、空状态处理 |
+| 6 | Performance | 页面加载速度、交互响应性 |
+| 7 | Data Integrity | CRUD 操作正确持久化、刷新不丢数据 |
+| 8 | Cross-Feature Integration | 功能间协作（如搜索 + 筛选 + 分页） |
+| 9 | Design System Consistency | 组件复用、跨页面一致性 |
+| 10 | "Wow Factor" | 动画、微交互、智能默认值 |
+
+4. **改进清单输出**：按影响力 × 可行性排序的 P0/P1/P2 改进条目，附具体文件和建议修复方案
+
+**Prompt 模板**：`prompts/templates/reviewer.txt`
+
+**产出物**：`artifacts/product-review-epoch-{N}.md`
+
+**与 Evaluator 的分工**：
+
+```
+Evaluator：这个 Sprint 的 5 条验收标准是否通过？（合同级）
+Reviewer ：这个产品作为整体，用户体验如何？值几分？（产品级）
+```
+
+### 15.4 新增 Agent：Polish Generator
+
+**角色定位**：专注于 **改善已有功能**，不添加新功能。外科手术式精确修复。
+
+**核心特点**：
+
+- 输入：Product Review 报告 + Polish 合同（Top N 改进项）
+- 工作方式：逐项修复，每项修复后验证，不重构无关代码
+- 优先级：**坏掉的功能 > 视觉不一致 > UX 缺口 > 响应式问题 > 微交互打磨**
+- 时间控制：单项修复超过 15 分钟则标记 "deferred" 跳过
+
+**两个 Prompt 模板**：
+- `prompts/templates/polish-contract.txt`：从 Review 的改进清单提取 Top N 生成 Polish 合同
+- `prompts/templates/polish-generator.txt`：按合同精确修复
+
+**产出物**：
+- `artifacts/polish-{N}-contract-final.md`
+- `artifacts/polish-{N}-handoff.md`
+
+### 15.5 Quality Gate 机制
+
+Quality Gate 是连接 Review 和 Polish 的自动化决策器。
+
+**工作原理**：
+
+```
+Product Review 完成
+        ↓
+  提取 Overall Quality Score (X.X / 10)
+        ↓
+  score >= QUALITY_THRESHOLD ?
+       ╱              ╲
+     Yes              No
+      ↓                ↓
+  跳过 Polish      生成 Polish Sprint
+  进入 Evolve      执行 → Re-review
+                         ↓
+                   score >= threshold ?
+                        ╱         ╲
+                      Yes         No (且 < MAX_POLISH_ROUNDS)
+                       ↓           ↓
+                    完成         继续 Polish
+```
+
+**Quality Score 加权计算**：Feature Completeness 和 UX Flow 权重为 2x，其余为 1x。
+
+**实现**：`lib/quality-gate.sh` 提供以下函数：
+- `extract_quality_score(review_file)` — 解析 Reviewer 报告中的分数
+- `quality_meets_threshold(score, threshold)` — 判断是否达标
+- `count_backlog_items(review_file)` — 统计改进清单条目数
+- `extract_top_backlog(review_file, n)` — 提取 Top N 改进条目
+- `generate_core_journeys()` — 从 Spec 提取核心用户旅程
+
+### 15.6 Evolution 目标队列
+
+V2 引入了 **目标队列（Goal Queue）** 概念，支持 Harness 持续接受新需求。
+
+**State 结构扩展**：
+
+```json
+{
+  "phase": "complete",
+  "epoch": 2,
+  "epoch_type": "polish",
+  "current_sprint": 3,
+  "total_sprints": 3,
+  "qa_round": 2,
+  "max_qa_rounds": 3,
+  "goal_queue": ["Add dark mode toggle", "Improve mobile navigation"],
+  "quality_scores": [
+    {"epoch": 1, "score": 5.2},
+    {"epoch": "1.1", "score": 6.8},
+    {"epoch": "1.2", "score": 7.3}
+  ],
+  "polish_round": 2,
+  "total_polish_rounds": 2,
+  "budget": 200,
+  "user_goal": "Build a personal bookmark manager with tagging and search."
+}
+```
+
+**目标注入方式**（不中断运行中的 Harness）：
+
+```bash
+./run-harness-full.sh --add-goal "Add dark mode toggle"
+./run-harness-full.sh --add-goal "Improve mobile navigation"
+```
+
+**Evolution 流程**：当 Harness 完成当前 Epoch 的 Build + Review + Polish 后，自动检查目标队列：
+
+1. 从队列取出下一个目标
+2. 运行 Evolution Planner：在 `spec.md` 尾部追加 1-2 个新 Sprint（不修改已有 Sprint）
+3. 重新解析 Sprint 数，从新 Sprint 开始 Build
+4. Build → Review → Polish 循环
+
+这样 Harness 可以 **无限期运行**，持续接受用户反馈并进化产品。
+
+### 15.7 Planner 约束优化
+
+V1 的 Planner 鼓励 "Be AMBITIOUS about scope"，导致 5-8 个 Sprint 的过大 Spec。V2 重新平衡了 **远见** 与 **纪律**：
+
+**关键变更**：
+
+| 规则 | V1 | V2 |
+|------|----|----|
+| Sprint 数 | 3-8 个 | **严格 3 个核心 Sprint** |
+| 每 Sprint 功能数 | 无限制 | **最多 2-3 个，深度实现** |
+| Sprint 1 要求 | 无特殊要求 | **必须视觉惊艳**（设计语言、动画、响应式） |
+| 打磨标准 | 无 | **每 Sprint 含 Polish Criteria**（加载骨架、空状态、过渡动画、响应式、键盘可访问） |
+| 远期功能 | 全部排入 Sprint | **放入 "Future Vision" 部分**，由 Evolution 按需纳入 |
+
+**理念**：3 个精品 Sprint 远胜 5 个粗糙 Sprint。质量优先于数量。
+
+### 15.8 Visual Context 注入
+
+V2 在 Generator 执行前，自动收集当前应用的截图，注入到 prompt 中。
+
+**原理**：
+
+1. `collect_visual_context()` 函数扫描 `artifacts/screenshots/`，取最新 10 张截图
+2. 以截图路径列表形式注入 Generator prompt 的 `__VISUAL_CONTEXT__` 占位符
+3. Generator 在修改代码前先查看截图，理解当前视觉基线
+
+**效果**：减少 Generator 因不了解当前 UI 状态而引入视觉回退的概率。
+
+### 15.9 完整文件清单与使用方式
+
+#### 文件结构
+
+```
+harness-kimi-demo/
+├── run-harness-full.sh          # 主编排脚本（Multi-Epoch 循环）
+├── lib/
+│   ├── state.sh                 # 状态持久化（支持 epoch/queue/scores）
+│   ├── parse-sprints.sh         # 解析 spec.md 中的 Sprint 数
+│   ├── check-verdict.sh         # 解析 QA 报告的 PASS/FAIL
+│   ├── render-prompt.sh         # Prompt 模板渲染（含 visual context）
+│   ├── restart-servers.sh       # 前后端服务重启
+│   └── quality-gate.sh          # 质量门（分数提取/阈值判断）
+├── prompts/templates/
+│   ├── planner.txt              # Planner（3 核心 Sprint + Polish Criteria）
+│   ├── contract.txt             # Sprint 合同
+│   ├── generator.txt            # Generator（含 visual context + 未修复 bug）
+│   ├── generator-fix.txt        # Generator Fix（全量 QA 上下文）
+│   ├── evaluator.txt            # Evaluator（Playwright MCP + 回归测试）
+│   ├── reviewer.txt             # Product Reviewer（10 维度评分）
+│   ├── polish-contract.txt      # Polish 合同（从改进清单提取）
+│   └── polish-generator.txt     # Polish Generator（精确修复）
+└── artifacts/
+    ├── harness-state.json       # 运行状态（epoch/queue/scores）
+    ├── spec.md                  # 产品规格
+    ├── sprint-N-contract-final.md
+    ├── sprint-N-handoff.md
+    ├── sprint-N-qa-round-M.md
+    ├── product-review-epoch-N.md          # Product Review 报告
+    ├── product-review-epoch-N-polish-M.md # Re-review 报告
+    ├── polish-M-contract-final.md         # Polish 合同
+    ├── polish-M-handoff.md                # Polish 交付
+    └── screenshots/                       # Playwright 截图
+```
+
+#### 使用方式
+
+```bash
+# 全新开始（自动经历 Build → Review → Polish → 完成）
+./run-harness-full.sh "Build a personal bookmark manager"
+
+# 从中断恢复
+./run-harness-full.sh --resume
+
+# 注入新目标（可在运行中执行，Harness 会在当前 Epoch 结束后自动处理）
+./run-harness-full.sh --add-goal "Add dark mode support"
+./run-harness-full.sh --add-goal "Add keyboard shortcuts"
+
+# 注入后让 Harness 继续运行
+./run-harness-full.sh --resume
+
+# 自定义配置
+QUALITY_THRESHOLD=8 MAX_POLISH_ROUNDS=5 MAX_EPOCHS=20 \
+  ./run-harness-full.sh "Build a task manager"
+
+# 严格模式（Sprint 失败立即停止）
+STRICT_MODE=true ./run-harness-full.sh "Build a ..."
+```
+
+### 15.10 配置参数参考
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `MAX_QA_ROUNDS` | 3 | 每 Sprint 最大 QA 轮数 |
+| `QUALITY_THRESHOLD` | 7.0 | Product Review 质量分达标阈值（1-10） |
+| `MAX_POLISH_ROUNDS` | 3 | 每 Epoch 最大打磨轮数 |
+| `MAX_EPOCHS` | 10 | 最大 Epoch 数（防止无限循环） |
+| `STRICT_MODE` | false | 是否在 Sprint FAIL 后立即停止 |
+| `START_FROM_SPRINT` | 1 | 从第几个 Sprint 开始（用于 resume） |
+| `KIMI_EXTRA_ARGS` | (空) | 传给 Kimi CLI 的额外参数 |
+
+**阈值建议**：
+
+| 质量分区间 | 含义 | 建议 |
+|-----------|------|------|
+| 1-3 | 基本不可用 | 检查 Sprint 是否有严重构建失败 |
+| 4-5 | 功能初具但粗糙 | 需要 2-3 轮 Polish |
+| 6-7 | 可用但缺乏打磨 | 需要 1-2 轮 Polish |
+| 7-8 | 质量良好 | 可投入使用，按需 Polish |
+| 8-10 | 惊艳 | 达标，进入 Evolution |
+
+---
+
 ## 附录 A：Planner 产出示例
 
 以下为原文 Planner 对 "Create a 2D retro game maker" 的产出节选：
@@ -2207,4 +2522,4 @@ Project Data Model: Each project contains:
 
 ---
 
-*本文档基于 Anthropic Engineering 公开博客整理，结合实际落地需求形成可执行方案。最后更新：2026-04-16。*
+*本文档基于 Anthropic Engineering 公开博客整理，结合实际落地需求形成可执行方案。V2 Multi-Epoch Evolution 架构于 2026-04-19 新增。最后更新：2026-04-19。*

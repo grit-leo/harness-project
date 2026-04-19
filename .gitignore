@@ -9,6 +9,7 @@
 
 # Local DB & caches
 **/*.db
+**/*.db.backup
 **/*.sqlite3
 **/.pytest_cache/
 **/test-results/

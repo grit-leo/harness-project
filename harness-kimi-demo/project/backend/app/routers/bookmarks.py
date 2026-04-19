@@ -78,7 +78,9 @@ def list_bookmarks(
     if search:
         like = f"%{search}%"
         query = query.filter(
-            (Bookmark.title.ilike(like)) | (Bookmark.summary.ilike(like))
+            (Bookmark.title.ilike(like))
+            | (Bookmark.summary.ilike(like))
+            | (Bookmark.tags.any(Tag.name.ilike(like)))
         )
     if tag:
         query = query.filter(Bookmark.tags.any(Tag.name.in_(tag)))

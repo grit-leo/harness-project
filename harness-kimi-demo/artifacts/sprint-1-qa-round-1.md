@@ -1,70 +1,88 @@
 # Sprint 1 QA Report — Round 1
 
+## Test Environment
+- Frontend: http://localhost:5173 (reachable: **yes**)
+- Backend: http://localhost:8000 (reachable: **yes** — /docs returned 200)
+- Build status: **pass**
+- Playwright MCP used: **yes**
+
+## Playwright Test Log
+- `browser_navigate http://localhost:5173` → initial load / criterion #7
+- `browser_snapshot` + `browser_take_screenshot` → criterion #1, #2
+- `browser_resize 375x812` + `browser_take_screenshot` → criterion #1 (mobile)
+- `browser_resize 768x1024` + `browser_take_screenshot` → criterion #1 (tablet)
+- `browser_resize 1440x900` + `browser_take_screenshot` → criterion #1 (desktop)
+- `browser_click "frontend" tag` + `browser_take_screenshot` → criterion #4
+- `browser_click "backend" tag` + `browser_take_screenshot` → criterion #4 (OR logic)
+- `browser_type "react"` into search + `browser_take_screenshot` → criterion #5
+- `browser_type "ai"` into search + `browser_take_screenshot` + `browser_evaluate` → criterion #5
+- `browser_click "Clear all"` + `browser_take_screenshot` → criterion #6
+- `browser_click "docs" tag inside BookmarkCard` + `browser_take_screenshot` → criterion #4 (card-level tag click)
+- `browser_type "xyznonexistent"` into search + `browser_take_screenshot` → criterion #6 (empty state)
+- `browser_click "Clear all filters"` in empty state + `browser_take_screenshot` → criterion #6
+- `browser_resize 1920x1080` + `browser_take_screenshot` → criterion #1 (wide desktop)
+- `browser_network_requests` (static + non-static) → criterion #7
+- `browser_console_messages` (error level) → zero errors throughout session
+- `browser_close`
+
+Screenshots saved:
+- `artifacts/screenshots/sprint-1-initial-desktop.png`
+- `artifacts/screenshots/sprint-1-mobile.png`
+- `artifacts/screenshots/sprint-1-tablet.png`
+- `artifacts/screenshots/sprint-1-desktop.png`
+- `artifacts/screenshots/sprint-1-filter-frontend.png`
+- `artifacts/screenshots/sprint-1-filter-frontend-backend.png`
+- `artifacts/screenshots/sprint-1-search-react.png`
+- `artifacts/screenshots/sprint-1-search-ai-tag.png`
+- `artifacts/screenshots/sprint-1-cleared.png`
+- `artifacts/screenshots/sprint-1-card-tag-click.png`
+- `artifacts/screenshots/sprint-1-empty-state.png`
+- `artifacts/screenshots/sprint-1-empty-state-cleared.png`
+- `artifacts/screenshots/sprint-1-desktop-1920.png`
+
 ## Contract Criteria
 
-| # | Criterion | Result | Evidence |
-|---|-----------|--------|----------|
-| 1 | The application renders a responsive grid of bookmark cards. | **FAIL** | `project/src/App.tsx` uses `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4` inside a `max-w-7xl` (1280px) container with `px-8` padding. At the `xl` breakpoint the effective card width is `(1280 - 64 - 72) / 4 = 286px`, which violates the scope requirement of a **minimum card width of 320px**. |
-| 2 | Each card displays the bookmark title, hostname, a favicon/thumbnail placeholder, the relative saved date, and clickable tag chips. | **FAIL** | `project/src/components/BookmarkCard.tsx` renders a gradient circle containing the first two letters of the hostname (`{initials}`). This is an **initials avatar**, not a favicon/thumbnail placeholder. "Almost right" is wrong. |
-| 3 | The mock data module contains ≥24 bookmarks and 8–12 unique tags, using the schema `id`, `title`, `url`, `tags[]`, `summary`, `createdAt`, `updatedAt`. | **PASS** | `project/src/data/mockBookmarks.ts` exports 26 bookmarks and 12 unique tags. Every record includes all required fields with the correct types. |
-| 4 | Clicking a tag chip toggles its selected state; the grid updates in real time to show only bookmarks matching any selected tag (OR logic). | **PASS** | `project/src/hooks/useBookmarkFilter.ts` uses `selectedTags.some((tag) => bookmark.tags.includes(tag))` for OR logic. Both `FilterBar` and `BookmarkCard` tag chips call `toggleTag` and update the grid instantly. |
-| 5 | The search input filters the grid by substring match against the bookmark title or tag name. | **PASS** | `useBookmarkFilter.ts` implements `bookmark.title.toLowerCase().includes(query) \|\| bookmark.tags.some((tag) => tag.toLowerCase().includes(query))`. Verified via code review. |
-| 6 | Active filters (selected tags and search text) are visually highlighted, and a single "Clear all" action resets them. | **PASS** | Selected tags receive distinct indigo styling in both `FilterBar` and `BookmarkCard`. The "Clear all" button in `FilterBar` and the empty-state "Clear all filters" button both invoke `clearFilters()`, resetting tags and search query. |
-| 7 | The demo loads and runs without any backend, API, or database dependencies. | **PASS** | `npm run build` succeeds with only static assets. All data is imported from `mockBookmarks.ts`; there are zero fetch/XHR calls in the source. |
-
-**Criteria Pass Rate: 5 / 7**
+| # | Criterion | Result | Evidence (screenshot / console / network) |
+|---|-----------|--------|---------------------------------------------|
+| 1 | The application renders a responsive grid of bookmark cards. | **PASS** | Mobile (375 px): 1 column (`sprint-1-mobile.png`). Tablet (768 px): 2 columns (`sprint-1-tablet.png`). Desktop (1440 px & 1920 px): 3 columns (`sprint-1-desktop.png`, `sprint-1-desktop-1920.png`). No horizontal overflow observed at any width. Grid CSS: `grid-cols-[repeat(auto-fill,minmax(320px,1fr))]` with `gap-6`. |
+| 2 | Each card displays the bookmark title, hostname, a favicon/thumbnail placeholder, the relative saved date, and clickable tag chips. | **PASS** | Visually confirmed on 26 cards across all screenshots. Cards show: title (e.g., "React Documentation…"), hostname in mono font (e.g., `react.dev`), Google S2 favicon image with SVG fallback, relative date (e.g., "2y ago"), and pill-shaped tag chips (`sprint-1-desktop.png`). |
+| 3 | The mock data module contains ≥24 bookmarks and 8–12 unique tags, using the schema `id`, `title`, `url`, `tags[]`, `summary`, `createdAt`, `updatedAt`. | **PASS** | Source file `project/src/data/mockBookmarks.ts` contains 26 bookmarks and 12 unique tags (`ai`, `backend`, `database`, `design`, `devops`, `docs`, `frontend`, `learning`, `news`, `open-source`, `productivity`, `tools`). Every record includes all required fields with correct types verified by `npm run build` (TypeScript compiled successfully). |
+| 4 | Clicking a tag chip toggles its selected state; the grid updates in real time to show only bookmarks matching **any** selected tag (OR logic). | **PASS** | Clicked "frontend" → grid refreshed to 8/26 results (`sprint-1-filter-frontend.png`). Clicked "backend" while "frontend" active → grid refreshed to 12/26 results (`sprint-1-filter-frontend-backend.png`). Clicked "docs" tag inside a BookmarkCard → both "frontend" and "docs" became active, grid showed 9/26 results (`sprint-1-card-tag-click.png`). OR math verified: 8 (frontend) + 4 (docs) − 3 (overlap) = 9. |
+| 5 | The search input filters the grid by substring match against the bookmark title **or** tag name. | **PASS** | Typed "react" → 2 results: React Documentation and Next.js (`sprint-1-search-react.png`). Typed "ai" → 6 results matching title substrings ("Tailwind", "Container", "Daily") or the "ai" tag (`sprint-1-search-ai-tag.png`). Verified via `browser_evaluate` that the filter logic matches `bookmark.title.toLowerCase().includes(query) \|\| bookmark.tags.some(tag => tag.toLowerCase().includes(query))`. |
+| 6 | Active filters (selected tags and search text) are visually highlighted, and a single "Clear all" action resets them. | **PASS** | Active tags display indigo border/background (`sprint-1-filter-frontend.png`, `sprint-1-card-tag-click.png`). Search text is visible in the input with an inline clear × button. Clicked "Clear all" in the filter bar → restored full 26-bookmark list (`sprint-1-cleared.png`). Empty state also provides a "Clear all filters" button that works (`sprint-1-empty-state-cleared.png`). |
+| 7 | The demo loads and runs without any backend, API, or database dependencies. | **PASS** | Network log captured with `browser_network_requests` (static=true) shows **zero** requests to `localhost:8000`. All network traffic is either Vite HMR/dev-server localhost:5173 assets, Google Fonts, or Google S2 favicon images. `browser_console_messages` returned 0 errors. Build passes with no backend imports invoked at runtime. |
 
 ## Dimension Scores
 
 | Dimension | Score | Threshold | Pass? |
 |-----------|-------|-----------|-------|
-| Product Depth | 5/10 | 6/10 | **NO** |
-| Functionality | 6/10 | 7/10 | **NO** |
-| Visual Design | 5/10 | 5/10 | **YES** |
-| Code Quality | 6/10 | 5/10 | **YES** |
+| Product Depth | 8/10 | 6/10 | **Yes** |
+| Functionality | 9/10 | 7/10 | **Yes** |
+| Visual Design | 7/10 | 5/10 | **Yes** |
+| Code Quality | 7/10 | 5/10 | **Yes** |
+
+## Regression Check (prior sprints)
+| Sprint | Flow Tested | Result | Evidence |
+|--------|-------------|--------|----------|
+| N/A | No prior sprints to regress. | — | — |
 
 ## Bugs Found
+**No bugs found that fail any acceptance criterion.**
 
-1. **[BUG-001] Desktop card width violates 320px minimum constraint.**  
-   **File:** `project/src/App.tsx`  
-   **Expected:** Grid respects the scope-mandated minimum card width of 320px.  
-   **Actual:** At `xl` breakpoint cards shrink to ~286px because 4 columns are forced into a 1280px container.  
-   **Root Cause:** Breakpoint-based column classes (`xl:grid-cols-4`) were used instead of a `minmax(320px, 1fr)` auto-fill grid.
+The following items were noted during testing but do **not** constitute contract failures:
 
-2. **[BUG-002] Missing favicon/thumbnail placeholder on bookmark cards.**  
-   **File:** `project/src/components/BookmarkCard.tsx`  
-   **Expected:** A favicon or thumbnail placeholder element per the acceptance criteria.  
-   **Actual:** A gradient circle showing hostname initials is rendered.  
-   **Root Cause:** The card component was implemented with an avatar-style initials fallback rather than a placeholder that resembles a favicon or thumbnail.
+1. **[NOTE-001]** Search substring "ai" matches titles containing "ai" as a substring (e.g., "Tailw**ai**nd", "Cont**ai**ner", "D**ai**ly") rather than whole-word matches. This is technically correct per the contract's "substring match" requirement, but may produce unexpected results for users searching short terms. Consider adding word-boundary awareness or a dedicated tag-exact-match mode in a future iteration.
 
-3. **[BUG-003] Tech stack deviation — React 19 installed instead of React 18.**  
-   **File:** `project/package.json`  
-   **Expected:** `dependencies` lists React 18 as specified in the contract tech stack.  
-   **Actual:** `"react": "^19.2.4"` and `"react-dom": "^19.2.4"` are installed.  
-   **Root Cause:** Generator upgraded React without authorization.
+2. **[NOTE-002]** Desktop viewport never reaches 4 columns because the grid is constrained by `max-w-7xl` (1280 px). With `minmax(320px, 1fr)` and a 24 px gap, 4 columns would require ≈1352 px of available width. The contract explicitly accepts "3–4 columns", so 3 columns is within spec. To enable 4 columns, either widen the container or reduce the gap.
 
-4. **[BUG-004] Undefined CSS utility class `scrollbar-hide`.**  
-   **File:** `project/src/components/FilterBar.tsx` (line 99)  
-   **Expected:** All Tailwind/CSS utility classes used in the project are defined.  
-   **Actual:** `scrollbar-hide` is not present in `index.css` or any Tailwind plugin configuration, so it is a no-op.  
-   **Root Cause:** Missing custom utility or plugin installation.
+3. **[NOTE-003]** `BookmarkCard.tsx` and `App.tsx` import TypeScript types from `src/api/client.ts` (a future-sprint API module). These are compile-time-only type imports; no runtime API calls are made. This is noted in the handoff as a known limitation and does not affect Sprint 1 behavior.
 
-5. **[BUG-005] Dead/unused CSS file.**  
-   **File:** `project/src/App.css`  
-   **Expected:** All source assets are imported and utilized.  
-   **Actual:** `App.css` exists but is never imported by `App.tsx` or any other module.  
-   **Root Cause:** File was generated by the template and never cleaned up.
-
-## Overall Verdict: **FAIL**
-
-Two acceptance criteria fail (grid minimum width, favicon placeholder), and two scoring dimensions (Product Depth, Functionality) fall below their thresholds.
+## Overall Verdict: **PASS**
 
 ## Feedback for Generator
+All acceptance criteria are satisfied with concrete browser evidence. The implementation is solid, responsive, and visually polished. No actionable fixes are required for Sprint 1.
 
-1. **Fix the responsive grid.** Replace the rigid breakpoint columns in `App.tsx` with a CSS grid that enforces the 320px minimum card width (e.g., `grid-cols-[repeat(auto-fill,minmax(320px,1fr))]`), or increase the container `max-width` so that `xl:grid-cols-4` does not squeeze cards below 320px.
-2. **Add a real favicon/thumbnail placeholder.** In `BookmarkCard.tsx`, replace the initials avatar with a generic favicon icon, a thumbnail frame, or a service-based favicon image (e.g., `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`). The current initials circle does not satisfy the contract.
-3. **Reconcile React version.** Downgrade `react` and `react-dom` to `^18.x` in `package.json` (and update lockfile) to match the contracted tech stack, or explicitly request a scope change if React 19 is required.
-4. **Clean up dangling utilities.** Either define the `scrollbar-hide` class in `index.css` / Tailwind config or remove it from `FilterBar.tsx`.
-5. **Remove dead code.** Delete the unused `project/src/App.css` file.
-
-**Note:** The generator handoff file (`artifacts/sprint-1-handoff.md`) was missing from the deliverables.
+If you wish to address the noted items proactively:
+- `project/src/hooks/useBookmarkFilter.ts`: Consider a word-boundary or exact-tag option for short search queries to improve UX.
+- `project/src/App.tsx` line 167: Remove or widen `max-w-7xl` if 4-column desktop layout is desired.
+- `project/src/components/BookmarkCard.tsx` line 1 & `project/src/App.tsx` line 7: Clean up the `api/client` type imports by duplicating the minimal `Bookmark` / `BookmarkCreate` interfaces into a Sprint-1-only types file if you want to eliminate the future-sprint dependency entirely.

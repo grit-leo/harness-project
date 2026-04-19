@@ -1,31 +1,49 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { BookmarkCard } from "./components/BookmarkCard";
 import { FilterBar } from "./components/FilterBar";
 import { BookmarkModal } from "./components/BookmarkModal";
-import { DigestPopover } from "./components/DigestPopover";
 import { useBookmarkFilter } from "./hooks/useBookmarkFilter";
 import { useAuth } from "./context/AuthContext";
-import { Link } from "react-router-dom";
 import {
   fetchBookmarks,
   fetchTags,
   createBookmark,
   updateBookmark,
   deleteBookmark,
-  applyTags,
   type Bookmark,
-  type Tag,
   type BookmarkCreate,
 } from "./api/client";
 
 function App() {
-  const { logout } = useAuth();
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
+  const { logout } = useAuth();
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [bmData, tagData] = await Promise.all([
+        fetchBookmarks(),
+        fetchTags(),
+      ]);
+      setBookmarks(bmData);
+      setTags(tagData.map((t) => t.name));
+    } catch (err: any) {
+      setError(err.message || "Failed to load bookmarks");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const {
     searchQuery,
@@ -35,47 +53,6 @@ function App() {
     clearFilters,
     filteredBookmarks,
   } = useBookmarkFilter(bookmarks);
-
-  const loadData = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const [bms, tgs] = await Promise.all([
-        fetchBookmarks(),
-        fetchTags(),
-      ]);
-      setBookmarks(bms);
-      setTags(tgs);
-    } catch (err: any) {
-      setError(err.message || "Failed to load data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Refetch when search or selected tags change (server-side filter support)
-  useEffect(() => {
-    let cancelled = false;
-    const loadFiltered = async () => {
-      try {
-        const bms = await fetchBookmarks(
-          searchQuery || undefined,
-          selectedTags.length ? selectedTags : undefined
-        );
-        if (!cancelled) setBookmarks(bms);
-      } catch {
-        // silent fail; initial load handles errors
-      }
-    };
-    loadFiltered();
-    return () => {
-      cancelled = true;
-    };
-  }, [searchQuery, selectedTags.join(",")]);
 
   const handleAdd = () => {
     setEditingBookmark(null);
@@ -91,46 +68,21 @@ function App() {
     if (!confirm("Are you sure you want to delete this bookmark?")) return;
     try {
       await deleteBookmark(bookmark.id);
-      setBookmarks((prev) => prev.filter((b) => b.id !== bookmark.id));
+      await loadData();
     } catch (err: any) {
       setError(err.message || "Failed to delete bookmark");
     }
   };
 
   const handleModalSubmit = async (payload: BookmarkCreate) => {
-    try {
-      if (editingBookmark) {
-        const updated = await updateBookmark(editingBookmark.id, payload);
-        setBookmarks((prev) =>
-          prev.map((b) => (b.id === updated.id ? updated : b))
-        );
-      } else {
-        const created = await createBookmark(payload);
-        setBookmarks((prev) => [created, ...prev]);
-      }
-      // Refresh tags in case new ones were created
-      const freshTags = await fetchTags();
-      setTags(freshTags);
-      if (!editingBookmark) {
-        setModalOpen(false);
-        setEditingBookmark(null);
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to save bookmark");
+    if (editingBookmark) {
+      await updateBookmark(editingBookmark.id, payload);
+    } else {
+      await createBookmark(payload);
     }
-  };
-
-  const handleApplyTags = async (id: string, tags: string[]) => {
-    try {
-      const updated = await applyTags(id, tags);
-      setBookmarks((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
-      const freshTags = await fetchTags();
-      setTags(freshTags);
-      setModalOpen(false);
-      setEditingBookmark(null);
-    } catch (err: any) {
-      setError(err.message || "Failed to apply tags");
-    }
+    await loadData();
+    setModalOpen(false);
+    setEditingBookmark(null);
   };
 
   return (
@@ -163,30 +115,22 @@ function App() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <a
-              href="https://github.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
-            >
-              GitHub
-            </a>
-            <Link
-              to="/discover"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
-            >
-              Discover
-            </Link>
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               to="/collections"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200 sm:block"
             >
               Collections
             </Link>
             <Link
+              to="/discover"
+              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200 sm:block"
+            >
+              Discover
+            </Link>
+            <Link
               to="/settings"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200 sm:block"
             >
               Settings
             </Link>
@@ -196,19 +140,40 @@ function App() {
             >
               Add bookmark
             </button>
-            <DigestPopover />
             <button
               onClick={logout}
               className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+              title="Log out"
             >
-              Log out
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="h-5 w-5"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"
+                />
+              </svg>
             </button>
           </div>
         </div>
       </header>
 
+      {error && (
+        <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+            {error}
+          </div>
+        </div>
+      )}
+
       <FilterBar
-        tags={tags.map((t) => t.name)}
+        tags={tags}
         selectedTags={selectedTags}
         searchQuery={searchQuery}
         onToggleTag={toggleTag}
@@ -220,39 +185,13 @@ function App() {
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {loading && bookmarks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-slate-800 border-t-indigo-500" />
-            <p className="text-slate-500">Loading bookmarks…</p>
-          </div>
-        ) : error ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 py-16 text-center">
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-900">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="h-8 w-8 text-slate-500"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-                />
-              </svg>
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-800 border-t-indigo-500" />
             </div>
             <h2 className="text-base font-semibold text-slate-200">
-              Something went wrong
+              Loading bookmarks…
             </h2>
-            <p className="mt-1 max-w-sm text-sm text-slate-500">{error}</p>
-            <button
-              type="button"
-              onClick={loadData}
-              className="mt-4 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-600"
-            >
-              Retry
-            </button>
           </div>
         ) : filteredBookmarks.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 py-16 text-center">
@@ -313,7 +252,6 @@ function App() {
           setEditingBookmark(null);
         }}
         onSubmit={handleModalSubmit}
-        onApplyTags={handleApplyTags}
         initialData={editingBookmark}
       />
     </div>
