@@ -1,6 +1,7 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field, ConfigDict
-from datetime import datetime
+
+from app.schemas.common import UtcDatetime
 
 
 class Condition(BaseModel):
@@ -34,8 +35,8 @@ class CollectionOut(BaseModel):
     isDefault: bool = Field(alias="is_default", serialization_alias="isDefault")
     visibility: str = "private"
     shareToken: str | None = Field(alias="share_token", serialization_alias="shareToken")
-    createdAt: datetime = Field(alias="created_at", serialization_alias="createdAt")
-    updatedAt: datetime = Field(alias="updated_at", serialization_alias="updatedAt")
+    createdAt: UtcDatetime = Field(alias="created_at", serialization_alias="createdAt")
+    updatedAt: UtcDatetime = Field(alias="updated_at", serialization_alias="updatedAt")
 
 
 class CollaboratorOut(BaseModel):
@@ -53,8 +54,8 @@ class PublicCollectionOut(BaseModel):
     name: str
     rules: dict = Field(alias="rules_json", serialization_alias="rules")
     ownerEmail: str = Field(alias="owner_email", serialization_alias="ownerEmail")
-    createdAt: datetime = Field(alias="created_at", serialization_alias="createdAt")
-    updatedAt: datetime = Field(alias="updated_at", serialization_alias="updatedAt")
+    createdAt: UtcDatetime = Field(alias="created_at", serialization_alias="createdAt")
+    updatedAt: UtcDatetime = Field(alias="updated_at", serialization_alias="updatedAt")
 
 
 class FollowOut(BaseModel):
@@ -64,7 +65,7 @@ class FollowOut(BaseModel):
     followerId: str = Field(alias="follower_id", serialization_alias="followerId")
     followingUserId: str | None = Field(alias="following_user_id", serialization_alias="followingUserId")
     followingCollectionId: str | None = Field(alias="following_collection_id", serialization_alias="followingCollectionId")
-    createdAt: datetime = Field(alias="created_at", serialization_alias="createdAt")
+    createdAt: UtcDatetime = Field(alias="created_at", serialization_alias="createdAt")
 
 
 class DigestItemOut(BaseModel):
@@ -76,4 +77,4 @@ class DigestItemOut(BaseModel):
     sourceCollectionId: str | None = Field(alias="source_collection_id", serialization_alias="sourceCollectionId")
     bookmarkId: str = Field(alias="bookmark_id", serialization_alias="bookmarkId")
     seen: bool
-    createdAt: datetime = Field(alias="created_at", serialization_alias="createdAt")
+    createdAt: UtcDatetime = Field(alias="created_at", serialization_alias="createdAt")

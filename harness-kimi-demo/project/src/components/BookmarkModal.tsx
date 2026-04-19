@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
-import { fetchSuggestedTags, type Bookmark, type BookmarkCreate } from "../api/client";
+import {
+  fetchSuggestedTags,
+  fetchSuggestedTagsForUrl,
+  type Bookmark,
+  type BookmarkCreate,
+} from "../api/client";
 
 interface BookmarkModalProps {
   isOpen: boolean;
@@ -51,10 +56,39 @@ export function BookmarkModal({
         setTags([]);
         setTagsInput("");
         setSuggestedTags([]);
+        setLoadingSuggested(false);
       }
       setEditingIndex(null);
     }
   }, [isOpen, initialData]);
+
+  // Auto-suggest tags for new bookmarks when URL + title are present
+  useEffect(() => {
+    if (!isOpen || isEditing) return;
+    if (!url.trim() || !title.trim() || !url.trim().startsWith("http")) {
+      setSuggestedTags([]);
+      setLoadingSuggested(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setLoadingSuggested(true);
+      fetchSuggestedTagsForUrl(url, title)
+        .then((tags) => {
+          if (!cancelled) setSuggestedTags(tags);
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (!cancelled) setLoadingSuggested(false);
+        });
+    }, 800);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [url, title, isOpen, isEditing]);
 
   if (!isOpen) return null;
 

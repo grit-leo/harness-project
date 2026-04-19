@@ -20,7 +20,7 @@ restart_backend() {
     if [[ -d .venv ]]; then
       source .venv/bin/activate
     fi
-    nohup python -m uvicorn main:app --host 127.0.0.1 --port 8000 \
+    nohup python3 -m uvicorn main:app --host 127.0.0.1 --port 8000 \
       > "$log_file" 2>&1 &
   )
   sleep 3

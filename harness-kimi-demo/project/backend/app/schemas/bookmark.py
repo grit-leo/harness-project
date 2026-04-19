@@ -1,6 +1,7 @@
 from typing import List
 from pydantic import BaseModel, HttpUrl, Field, ConfigDict, field_validator
-from datetime import datetime
+
+from app.schemas.common import UtcDatetime
 
 
 class BookmarkCreate(BaseModel):
@@ -26,8 +27,8 @@ class BookmarkOut(BaseModel):
     tags: List[str]
     summary: str
     suggestedTags: List[str] = Field(default=[], alias="suggested_tags", serialization_alias="suggestedTags")
-    createdAt: datetime = Field(alias="created_at", serialization_alias="createdAt")
-    updatedAt: datetime = Field(alias="updated_at", serialization_alias="updatedAt")
+    createdAt: UtcDatetime = Field(alias="created_at", serialization_alias="createdAt")
+    updatedAt: UtcDatetime = Field(alias="updated_at", serialization_alias="updatedAt")
 
     @field_validator("tags", mode="before")
     @classmethod

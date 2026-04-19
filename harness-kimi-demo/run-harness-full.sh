@@ -297,7 +297,11 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
         state_set phase "qa"
 
         prompt="$(render_evaluator_prompt "$sprint" "$qa_round")"
+        # Increase step limit so Evaluator has time to write the full QA report
+        _old_args="$KIMI_EXTRA_ARGS"
+        KIMI_EXTRA_ARGS="$KIMI_EXTRA_ARGS --max-steps-per-turn 100"
         run_kimi "Evaluator Sprint ${sprint} R${qa_round}" "$prompt"
+        KIMI_EXTRA_ARGS="$_old_args"
 
         if [[ ! -f "$QA_REPORT" ]]; then
           echo "  WARNING: QA report not written. Treating as FAIL."
@@ -327,7 +331,11 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
             state_set phase "qa_fix"
 
             prompt="$(render_generator_fix_prompt "$sprint" "$qa_round")"
+            # Disable MCP for Generator Fix to avoid Playwright initialization deadlock
+            _old_args="$KIMI_EXTRA_ARGS"
+            KIMI_EXTRA_ARGS="$KIMI_EXTRA_ARGS --mcp-config-file /tmp/empty-mcp.json"
             run_kimi "Generator Fix Sprint ${sprint} R${qa_round}" "$prompt"
+            KIMI_EXTRA_ARGS="$_old_args"
 
             rm -f "$HANDOFF_FILE"
           fi

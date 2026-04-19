@@ -18,6 +18,13 @@ export interface BookmarkCreate {
   tags?: string[];
 }
 
+export interface BookmarkUpdate {
+  url?: string;
+  title?: string;
+  summary?: string;
+  tags?: string[];
+}
+
 export interface Tag {
   id: string;
   name: string;
@@ -245,7 +252,7 @@ export async function createBookmark(payload: BookmarkCreate): Promise<Bookmark>
 
 export async function updateBookmark(
   id: string,
-  payload: BookmarkCreate
+  payload: BookmarkUpdate
 ): Promise<Bookmark> {
   const res = await apiFetch(`/api/bookmarks/${id}`, {
     method: "PATCH",

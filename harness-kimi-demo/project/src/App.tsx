@@ -11,6 +11,7 @@ import {
   createBookmark,
   updateBookmark,
   deleteBookmark,
+  applyTags,
   type Bookmark,
   type BookmarkCreate,
 } from "./api/client";
@@ -83,6 +84,11 @@ function App() {
     await loadData();
     setModalOpen(false);
     setEditingBookmark(null);
+  };
+
+  const handleApplyTags = async (id: string, tags: string[]) => {
+    await applyTags(id, tags);
+    await loadData();
   };
 
   return (
@@ -252,6 +258,7 @@ function App() {
           setEditingBookmark(null);
         }}
         onSubmit={handleModalSubmit}
+        onApplyTags={editingBookmark ? handleApplyTags : undefined}
         initialData={editingBookmark}
       />
     </div>

@@ -66,6 +66,7 @@ export function BookmarkCard({
         <img
           src={faviconUrl}
           alt=""
+          aria-label="Favicon"
           className="h-12 w-12 shrink-0 rounded-xl bg-slate-800 object-contain ring-1 ring-inset ring-white/10 transition-colors"
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).src =
