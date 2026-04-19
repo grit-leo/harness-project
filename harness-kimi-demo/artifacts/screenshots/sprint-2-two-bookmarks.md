@@ -1,0 +1,77 @@
+- generic [ref=e40]:
+  - banner [ref=e41]:
+    - generic [ref=e42]:
+      - generic [ref=e43]:
+        - img [ref=e45]
+        - generic [ref=e47]:
+          - heading "Lumina" [level=1] [ref=e48]
+          - paragraph [ref=e49]: Intelligent Bookmark Library
+      - generic [ref=e50]:
+        - link "Collections" [ref=e51] [cursor=pointer]:
+          - /url: /collections
+        - link "Discover" [ref=e52] [cursor=pointer]:
+          - /url: /discover
+        - link "Settings" [ref=e53] [cursor=pointer]:
+          - /url: /settings
+        - button "Add bookmark" [ref=e54]
+        - button "Log out" [ref=e55]:
+          - img [ref=e56]
+  - generic [ref=e60]:
+    - generic [ref=e61]:
+      - generic [ref=e62]:
+        - generic:
+          - img
+        - textbox "Search bookmarks or tags..." [ref=e63]
+      - generic [ref=e64]:
+        - generic [ref=e65]: 2 / 2
+        - button "Clear all" [disabled] [ref=e66]
+    - generic [ref=e68]:
+      - button "art" [ref=e213]
+      - button "code" [ref=e170]
+      - button "design" [ref=e214]
+      - button "dev" [ref=e171]
+      - button "github" [ref=e172]
+      - button "inspiration" [ref=e215]
+      - button "qa" [ref=e99]
+      - button "sprint2" [ref=e100]
+      - button "testing" [ref=e101]
+  - main [ref=e69]:
+    - generic [ref=e70]:
+      - article [ref=e216]:
+        - link "Design Article design.com" [ref=e217] [cursor=pointer]:
+          - /url: https://design.com/article
+          - generic [ref=e218]:
+            - heading "Design Article" [level=3] [ref=e219]
+            - paragraph [ref=e220]: design.com
+        - paragraph [ref=e221]: An article about design
+        - generic [ref=e222]:
+          - button "art" [ref=e223]
+          - button "inspiration" [ref=e224]
+          - button "design" [ref=e225]
+        - generic [ref=e226]:
+          - generic [ref=e227]: 8h ago
+          - generic [ref=e228]:
+            - button "Edit" [ref=e229]:
+              - img [ref=e230]
+            - button "Delete" [ref=e232]:
+              - img [ref=e233]
+      - article [ref=e173]:
+        - link "GitHub Test github.com" [ref=e174] [cursor=pointer]:
+          - /url: https://github.com/test
+          - generic [ref=e175]:
+            - heading "GitHub Test" [level=3] [ref=e176]
+            - paragraph [ref=e177]: github.com
+        - paragraph [ref=e178]: A GitHub repo for testing
+        - generic [ref=e179]:
+          - button "code" [ref=e180]
+          - button "github" [ref=e181]
+          - button "dev" [ref=e182]
+        - generic [ref=e183]:
+          - generic [ref=e184]: 8h ago
+          - generic [ref=e185]:
+            - button "Edit" [ref=e186]:
+              - img [ref=e187]
+            - button "Delete" [ref=e189]:
+              - img [ref=e190]
+  - contentinfo [ref=e77]:
+    - paragraph [ref=e78]: © 2026 Lumina. Built for the love of bookmarks.

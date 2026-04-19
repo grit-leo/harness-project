@@ -1,0 +1,53 @@
+- generic [ref=e40]:
+  - banner [ref=e41]:
+    - generic [ref=e42]:
+      - generic [ref=e43]:
+        - img [ref=e45]
+        - generic [ref=e47]:
+          - heading "Lumina" [level=1] [ref=e48]
+          - paragraph [ref=e49]: Intelligent Bookmark Library
+      - generic [ref=e50]:
+        - link "Collections" [ref=e51] [cursor=pointer]:
+          - /url: /collections
+        - link "Discover" [ref=e52] [cursor=pointer]:
+          - /url: /discover
+        - link "Settings" [ref=e53] [cursor=pointer]:
+          - /url: /settings
+        - button "Add bookmark" [active] [ref=e54]
+        - button "Log out" [ref=e55]:
+          - img [ref=e56]
+  - generic [ref=e61]:
+    - generic [ref=e62]:
+      - generic:
+        - img
+      - textbox "Search bookmarks or tags..." [ref=e63]
+    - generic [ref=e64]:
+      - generic [ref=e65]: 0 / 0
+      - button "Clear all" [disabled] [ref=e66]
+  - main [ref=e69]:
+    - generic [ref=e70]:
+      - img [ref=e72]
+      - heading "No bookmarks found" [level=2] [ref=e74]
+      - paragraph [ref=e75]: Try adjusting your search or clearing filters to see more results.
+      - button "Clear all filters" [ref=e76]
+  - contentinfo [ref=e77]:
+    - paragraph [ref=e78]: © 2026 Lumina. Built for the love of bookmarks.
+  - generic [ref=e80]:
+    - heading "Add bookmark" [level=2] [ref=e81]
+    - generic [ref=e82]:
+      - generic [ref=e83]:
+        - generic [ref=e84]: URL
+        - textbox "https://example.com" [ref=e85]
+      - generic [ref=e86]:
+        - generic [ref=e87]: Title
+        - textbox "Bookmark title" [ref=e88]
+      - generic [ref=e89]:
+        - generic [ref=e90]: Summary
+        - textbox "Short description..." [ref=e91]
+      - generic [ref=e92]:
+        - generic [ref=e93]: Tags
+        - textbox "design, inspiration, blog" [ref=e94]
+        - paragraph [ref=e95]: Separate tags with commas
+      - generic [ref=e96]:
+        - button "Cancel" [ref=e97]
+        - button "Add bookmark" [ref=e98]

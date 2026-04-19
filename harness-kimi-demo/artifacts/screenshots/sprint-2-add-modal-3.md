@@ -1,0 +1,74 @@
+- generic [ref=e40]:
+  - banner [ref=e41]:
+    - generic [ref=e42]:
+      - generic [ref=e43]:
+        - img [ref=e45]
+        - generic [ref=e47]:
+          - heading "Lumina" [level=1] [ref=e48]
+          - paragraph [ref=e49]: Intelligent Bookmark Library
+      - generic [ref=e50]:
+        - link "Collections" [ref=e51] [cursor=pointer]:
+          - /url: /collections
+        - link "Discover" [ref=e52] [cursor=pointer]:
+          - /url: /discover
+        - link "Settings" [ref=e53] [cursor=pointer]:
+          - /url: /settings
+        - button "Add bookmark" [active] [ref=e54]
+        - button "Log out" [ref=e55]:
+          - img [ref=e56]
+  - generic [ref=e60]:
+    - generic [ref=e61]:
+      - generic [ref=e62]:
+        - generic:
+          - img
+        - textbox "Search bookmarks or tags..." [ref=e63]
+      - generic [ref=e64]:
+        - generic [ref=e65]: 1 / 1
+        - button "Clear all" [disabled] [ref=e66]
+    - generic [ref=e68]:
+      - button "code" [ref=e170]
+      - button "dev" [ref=e171]
+      - button "github" [ref=e172]
+      - button "qa" [ref=e99]
+      - button "sprint2" [ref=e100]
+      - button "testing" [ref=e101]
+  - main [ref=e69]:
+    - article [ref=e173]:
+      - link "GitHub Test github.com" [ref=e174] [cursor=pointer]:
+        - /url: https://github.com/test
+        - generic [ref=e175]:
+          - heading "GitHub Test" [level=3] [ref=e176]
+          - paragraph [ref=e177]: github.com
+      - paragraph [ref=e178]: A GitHub repo for testing
+      - generic [ref=e179]:
+        - button "code" [ref=e180]
+        - button "github" [ref=e181]
+        - button "dev" [ref=e182]
+      - generic [ref=e183]:
+        - generic [ref=e184]: 8h ago
+        - generic [ref=e185]:
+          - button "Edit" [ref=e186]:
+            - img [ref=e187]
+          - button "Delete" [ref=e189]:
+            - img [ref=e190]
+  - contentinfo [ref=e77]:
+    - paragraph [ref=e78]: © 2026 Lumina. Built for the love of bookmarks.
+  - generic [ref=e194]:
+    - heading "Add bookmark" [level=2] [ref=e195]
+    - generic [ref=e196]:
+      - generic [ref=e197]:
+        - generic [ref=e198]: URL
+        - textbox "https://example.com" [ref=e199]
+      - generic [ref=e200]:
+        - generic [ref=e201]: Title
+        - textbox "Bookmark title" [ref=e202]
+      - generic [ref=e203]:
+        - generic [ref=e204]: Summary
+        - textbox "Short description..." [ref=e205]
+      - generic [ref=e206]:
+        - generic [ref=e207]: Tags
+        - textbox "design, inspiration, blog" [ref=e208]
+        - paragraph [ref=e209]: Separate tags with commas
+      - generic [ref=e210]:
+        - button "Cancel" [ref=e211]
+        - button "Add bookmark" [ref=e212]

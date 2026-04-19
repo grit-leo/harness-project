@@ -1,12 +1,14 @@
 {
-  "phase": "complete",
-  "current_sprint": 5,
+  "phase": "qa_fix",
+  "current_sprint": 2,
   "total_sprints": 5,
-  "qa_round": 3,
+  "qa_round": 1,
   "max_qa_rounds": 3,
   "budget": 200,
   "user_goal": "Build a personal bookmark manager with tagging and search.",
   "started_at": "2026-04-17T02:06:41Z",
-  "updated_at": "2026-04-19T07:07:55Z",
-  "goal_queue": []
+  "updated_at": "2026-04-19T08:55:02Z",
+  "goal_queue": [],
+  "epoch": 2,
+  "epoch_type": "build"
 }

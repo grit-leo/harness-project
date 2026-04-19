@@ -1,0 +1,17 @@
+- generic [ref=e23]:
+  - generic [ref=e24]:
+    - img [ref=e26]
+    - heading "Lumina" [level=1] [ref=e28]
+  - heading "Create your account" [level=2] [ref=e29]
+  - generic [ref=e30]:
+    - generic [ref=e31]:
+      - generic [ref=e32]: Email
+      - textbox "you@example.com" [ref=e33]
+    - generic [ref=e34]:
+      - generic [ref=e35]: Password
+      - textbox "••••••••" [ref=e36]
+    - button "Sign up" [ref=e37]
+  - paragraph [ref=e38]:
+    - text: Already have an account?
+    - link "Sign in" [ref=e39] [cursor=pointer]:
+      - /url: /login

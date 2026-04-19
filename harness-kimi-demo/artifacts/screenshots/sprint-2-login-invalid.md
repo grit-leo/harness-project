@@ -1,0 +1,18 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - img [ref=e7]
+    - heading "Lumina" [level=1] [ref=e9]
+  - heading "Sign in to your account" [level=2] [ref=e10]
+  - generic [ref=e21]: Invalid credentials
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]: Email
+      - textbox "you@example.com" [ref=e14]: wrong@example.com
+    - generic [ref=e15]:
+      - generic [ref=e16]: Password
+      - textbox "••••••••" [ref=e17]: wrongpass
+    - button "Sign in" [ref=e18]
+  - paragraph [ref=e19]:
+    - text: Don’t have an account?
+    - link "Sign up" [ref=e20] [cursor=pointer]:
+      - /url: /signup

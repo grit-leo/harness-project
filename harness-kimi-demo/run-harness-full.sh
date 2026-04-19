@@ -479,11 +479,12 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
       # ── Check if quality improved enough ─────────────────
       if [[ -f "$POLISH_REVIEW" ]]; then
         NEW_SCORE="$(extract_quality_score "$POLISH_REVIEW")"
+        PRE_POLISH_SCORE="$QUALITY_SCORE"
         state_record_quality "${CURRENT_EPOCH}.${POLISH_ROUND}" "$NEW_SCORE"
         QUALITY_SCORE="$NEW_SCORE"
 
         echo ""
-        echo "  Post-polish quality: ${NEW_SCORE} / 10 (was: ${QUALITY_SCORE})"
+        echo "  Post-polish quality: ${NEW_SCORE} / 10 (was: ${PRE_POLISH_SCORE})"
 
         MEETS="$(quality_meets_threshold "$NEW_SCORE" "$QUALITY_THRESHOLD")"
         if [[ "$MEETS" == "true" ]]; then

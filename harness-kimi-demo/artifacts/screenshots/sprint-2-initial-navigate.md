@@ -1,0 +1,50 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e8]
+        - generic [ref=e10]:
+          - heading "Lumina" [level=1] [ref=e11]
+          - paragraph [ref=e12]: Intelligent Bookmark Library
+      - generic [ref=e13]:
+        - link "Collections" [ref=e14] [cursor=pointer]:
+          - /url: /collections
+        - link "Discover" [ref=e15] [cursor=pointer]:
+          - /url: /discover
+        - link "Settings" [ref=e16] [cursor=pointer]:
+          - /url: /settings
+        - button "Add bookmark" [ref=e17]
+        - button "Log out" [ref=e18]:
+          - img [ref=e19]
+  - generic [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - generic:
+          - img
+        - textbox "Search bookmarks or tags..." [ref=e26]
+      - generic [ref=e27]:
+        - generic [ref=e28]: 1 / 1
+        - button "Clear all" [disabled] [ref=e29]
+    - generic [ref=e31]:
+      - button "qa" [ref=e32]
+      - button "test" [ref=e33]
+  - main [ref=e34]:
+    - article [ref=e36]:
+      - link "Test Page for AI Enrichment example.com" [ref=e37] [cursor=pointer]:
+        - /url: https://example.com/test-page
+        - generic [ref=e38]:
+          - heading "Test Page for AI Enrichment" [level=3] [ref=e39]
+          - paragraph [ref=e40]: example.com
+      - paragraph [ref=e41]: A test page summary
+      - generic [ref=e42]:
+        - button "qa" [ref=e43]
+        - button "test" [ref=e44]
+      - generic [ref=e45]:
+        - generic [ref=e46]: 1d ago
+        - generic [ref=e47]:
+          - button "Edit" [ref=e48]:
+            - img [ref=e49]
+          - button "Delete" [ref=e51]:
+            - img [ref=e52]
+  - contentinfo [ref=e55]:
+    - paragraph [ref=e56]: © 2026 Lumina. Built for the love of bookmarks.

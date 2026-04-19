@@ -1,0 +1,52 @@
+- generic [ref=e40]:
+  - banner [ref=e41]:
+    - generic [ref=e42]:
+      - generic [ref=e43]:
+        - img [ref=e45]
+        - generic [ref=e47]:
+          - heading "Lumina" [level=1] [ref=e48]
+          - paragraph [ref=e49]: Intelligent Bookmark Library
+      - generic [ref=e50]:
+        - link "Collections" [ref=e51] [cursor=pointer]:
+          - /url: /collections
+        - link "Discover" [ref=e52] [cursor=pointer]:
+          - /url: /discover
+        - link "Settings" [ref=e53] [cursor=pointer]:
+          - /url: /settings
+        - button "Add bookmark" [ref=e54]
+        - button "Log out" [ref=e55]:
+          - img [ref=e56]
+  - generic [ref=e60]:
+    - generic [ref=e61]:
+      - generic [ref=e62]:
+        - generic:
+          - img
+        - textbox "Search bookmarks or tags..." [ref=e63]
+      - generic [ref=e64]:
+        - generic [ref=e65]: 1 / 1
+        - button "Clear all" [disabled] [ref=e66]
+    - generic [ref=e68]:
+      - button "qa" [ref=e99]
+      - button "sprint2" [ref=e100]
+      - button "testing" [ref=e101]
+  - main [ref=e69]:
+    - article [ref=e102]:
+      - link "QA Test Bookmark example.com" [ref=e103] [cursor=pointer]:
+        - /url: https://example.com/qa-test
+        - generic [ref=e104]:
+          - heading "QA Test Bookmark" [level=3] [ref=e105]
+          - paragraph [ref=e106]: example.com
+      - paragraph [ref=e107]: A bookmark created during QA testing
+      - generic [ref=e108]:
+        - button "testing" [ref=e109]
+        - button "sprint2" [ref=e110]
+        - button "qa" [ref=e111]
+      - generic [ref=e112]:
+        - generic [ref=e113]: 8h ago
+        - generic [ref=e114]:
+          - button "Edit" [ref=e115]:
+            - img [ref=e116]
+          - button "Delete" [ref=e118]:
+            - img [ref=e119]
+  - contentinfo [ref=e77]:
+    - paragraph [ref=e78]: © 2026 Lumina. Built for the love of bookmarks.

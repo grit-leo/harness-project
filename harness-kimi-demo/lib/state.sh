@@ -102,7 +102,7 @@ else:
 "
 }
 
-# Record a quality score for the current epoch
+# Record a quality score for the current epoch (epoch may be "3" or "3.1" after polish re-review)
 state_record_quality() {
   local epoch="$1"
   local score="$2"
@@ -112,7 +112,12 @@ with open('${STATE_FILE}') as f:
     d = json.load(f)
 if 'quality_scores' not in d:
     d['quality_scores'] = []
-d['quality_scores'].append({'epoch': int('${epoch}'), 'score': float('${score}')})
+label = '''${epoch}'''
+try:
+    epoch_val = int(label) if '.' not in label else label
+except ValueError:
+    epoch_val = label
+d['quality_scores'].append({'epoch': epoch_val, 'score': float('${score}')})
 d['updated_at'] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 with open('${STATE_FILE}', 'w') as f:
     json.dump(d, f, indent=2, ensure_ascii=False)
