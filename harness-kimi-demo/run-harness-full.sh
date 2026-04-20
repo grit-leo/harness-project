@@ -58,16 +58,51 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM
 
-# ── Helper: run kimi with timing ─────────────────────────────────
+# ── Helper: run kimi with timing + auto-retry ─────────────────────
+# Usage: run_kimi "Label" "$prompt" [expected_artifact]
+# If expected_artifact is given, success is judged by whether the file exists
+# after kimi returns (Kimi CLI may exit 0 even on Connection error).
+KIMI_MAX_RETRIES="${KIMI_MAX_RETRIES:-3}"
+KIMI_RETRY_DELAY="${KIMI_RETRY_DELAY:-10}"
+
 run_kimi() {
   local label="$1"
   local prompt="$2"
-  local t_start t_end elapsed
+  local expected_file="${3:-}"
+  local t_start t_end elapsed attempt=0 exit_code ok
 
   t_start="$(date +%s)"
-  echo "  [kimi] ${label} — started at $(date +%H:%M:%S)"
 
-  kimi --print -w "$ROOT" $KIMI_EXTRA_ARGS -p "$prompt"
+  while (( attempt < KIMI_MAX_RETRIES )); do
+    attempt=$(( attempt + 1 ))
+    if (( attempt > 1 )); then
+      echo "  [kimi] ${label} — retry ${attempt}/${KIMI_MAX_RETRIES} after ${KIMI_RETRY_DELAY}s cooldown..."
+      sleep "$KIMI_RETRY_DELAY"
+    fi
+
+    echo "  [kimi] ${label} — started at $(date +%H:%M:%S)"
+
+    set +e
+    kimi --print -w "$ROOT" $KIMI_EXTRA_ARGS -p "$prompt"
+    exit_code=$?
+    set -e
+
+    ok=true
+    if (( exit_code != 0 )); then
+      ok=false
+    fi
+    if [[ -n "$expected_file" && ! -f "$expected_file" ]]; then
+      ok=false
+    fi
+
+    if $ok; then
+      break
+    fi
+
+    echo "  [kimi] ${label} — attempt ${attempt} failed (exit=${exit_code}, artifact=$(
+      [[ -n "$expected_file" ]] && { [[ -f "$expected_file" ]] && echo "exists" || echo "MISSING"; } || echo "n/a"
+    ))"
+  done
 
   t_end="$(date +%s)"
   elapsed=$(( t_end - t_start ))
@@ -75,15 +110,55 @@ run_kimi() {
 }
 
 # Agents that need Playwright MCP (Evaluator, Reviewer).
-# Kills leftover browsers first to prevent CDP / lock conflicts.
+# Kills leftover browsers before EACH attempt to prevent CDP / lock conflicts.
 run_kimi_with_browser() {
-  kill_playwright
-  run_kimi "$@"
+  local label="$1"
+  local prompt="$2"
+  local expected_file="${3:-}"
+  local t_start t_end elapsed attempt=0 exit_code ok
+
+  t_start="$(date +%s)"
+
+  while (( attempt < KIMI_MAX_RETRIES )); do
+    attempt=$(( attempt + 1 ))
+    if (( attempt > 1 )); then
+      echo "  [kimi] ${label} — retry ${attempt}/${KIMI_MAX_RETRIES} after ${KIMI_RETRY_DELAY}s cooldown..."
+      sleep "$KIMI_RETRY_DELAY"
+    fi
+
+    kill_playwright
+
+    echo "  [kimi] ${label} — started at $(date +%H:%M:%S)"
+
+    set +e
+    kimi --print -w "$ROOT" $KIMI_EXTRA_ARGS -p "$prompt"
+    exit_code=$?
+    set -e
+
+    ok=true
+    if (( exit_code != 0 )); then
+      ok=false
+    fi
+    if [[ -n "$expected_file" && ! -f "$expected_file" ]]; then
+      ok=false
+    fi
+
+    if $ok; then
+      break
+    fi
+
+    echo "  [kimi] ${label} — attempt ${attempt} failed (exit=${exit_code}, artifact=$(
+      [[ -n "$expected_file" ]] && { [[ -f "$expected_file" ]] && echo "exists" || echo "MISSING"; } || echo "n/a"
+    ))"
+  done
+
+  t_end="$(date +%s)"
+  elapsed=$(( t_end - t_start ))
+  echo "  [kimi] ${label} — done in $(( elapsed / 60 ))m $(( elapsed % 60 ))s"
 }
 
 # Agents that do NOT need the browser (Planner, Generator, Contract, Polish, Evolution).
-# Disables MCP entirely so Kimi won't start Playwright, avoiding pointless process
-# creation and the main source of deadlocks.
+# Disables MCP entirely so Kimi won't start Playwright.
 run_kimi_no_browser() {
   local _saved_args="$KIMI_EXTRA_ARGS"
   KIMI_EXTRA_ARGS="$KIMI_EXTRA_ARGS --mcp-config-file /tmp/empty-mcp.json"
@@ -149,12 +224,12 @@ if $RESUME && state_exists; then
       START_FROM_SPRINT="$(state_get current_sprint)"
       [[ "$START_FROM_SPRINT" == "0" ]] && START_FROM_SPRINT=1
       ;;
-    review|polishing|polish_qa)
-      # Will enter the correct epoch loop below
+    review|review_failed|polishing|polish_build|polish_qa)
       ;;
     complete|blocked)
       echo "  Previous run is ${local_phase}. Starting next epoch."
       CURRENT_EPOCH=$(( CURRENT_EPOCH + 1 ))
+      START_FROM_SPRINT=1
       ;;
   esac
 
@@ -207,10 +282,11 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
     state_set epoch_type "build"
 
     prompt="$(render_planner_prompt "$USER_GOAL")"
-    run_kimi_no_browser "Planner" "$prompt"
+    run_kimi_no_browser "Planner" "$prompt" "artifacts/spec.md"
 
     if [[ ! -f artifacts/spec.md ]]; then
       echo "ERROR: Planner did not create artifacts/spec.md" >&2
+      state_set phase "planning_failed" || true
       exit 1
     fi
     state_set phase "planning_done"
@@ -219,7 +295,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
   fi
 
   # ── Parse sprint count ─────────────────────────────────────────
-  TOTAL_SPRINTS="$(parse_sprint_count)"
+  TOTAL_SPRINTS="$(parse_sprint_count || echo 0)"
   state_set total_sprints "$TOTAL_SPRINTS"
   echo "  Spec contains $TOTAL_SPRINTS sprints."
 
@@ -238,7 +314,9 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
   # ════════════════════════════════════════════════════════════════
   SKIP_BUILD=false
   current_phase="$(state_get phase)"
-  if [[ "$current_phase" == "review" || "$current_phase" == "polishing" || "$current_phase" == "polish_qa" ]]; then
+  if [[ "$current_phase" == "review" || "$current_phase" == "review_failed" || \
+        "$current_phase" == "polishing" || "$current_phase" == "polish_build" || \
+        "$current_phase" == "polish_qa" ]]; then
     SKIP_BUILD=true
     echo "  [SKIP] Build phase — resuming from ${current_phase} phase."
   fi
@@ -260,11 +338,11 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
 
         sprint_section="$(extract_sprint_section "$sprint")"
         prompt="$(render_contract_prompt "$sprint" "$sprint_section")"
-        run_kimi_no_browser "Contract Sprint ${sprint}" "$prompt"
+        run_kimi_no_browser "Contract Sprint ${sprint}" "$prompt" "$CONTRACT_FILE"
 
         if [[ ! -f "$CONTRACT_FILE" ]]; then
           echo "  WARNING: Contract file not created. Retrying once..."
-          run_kimi_no_browser "Contract Sprint ${sprint} (retry)" "$prompt"
+          run_kimi_no_browser "Contract Sprint ${sprint} (retry)" "$prompt" "$CONTRACT_FILE"
         fi
         if [[ ! -f "$CONTRACT_FILE" ]]; then
           echo "  WARNING: Contract still not created. Using draft if available."
@@ -302,7 +380,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
 
         if [[ -f "$QA_REPORT" ]]; then
           echo "  [SKIP] QA report already exists: $QA_REPORT"
-          verdict="$(check_qa_passed "$QA_REPORT")"
+          verdict="$(check_qa_passed "$QA_REPORT" || echo false)"
           if [[ "$verdict" == "true" ]]; then
             PASSED=true
             break
@@ -311,6 +389,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
         fi
 
         restart_backend
+        restart_frontend
 
         log_phase "SPRINT ${sprint} — QA ROUND ${qa_round}/${EFFECTIVE_MAX_QA}" "Evaluating..."
         state_set phase "qa"
@@ -318,14 +397,14 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
         prompt="$(render_evaluator_prompt "$sprint" "$qa_round")"
         _saved_args="$KIMI_EXTRA_ARGS"
         KIMI_EXTRA_ARGS="$KIMI_EXTRA_ARGS --max-steps-per-turn 100"
-        run_kimi_with_browser "Evaluator Sprint ${sprint} R${qa_round}" "$prompt"
+        run_kimi_with_browser "Evaluator Sprint ${sprint} R${qa_round}" "$prompt" "$QA_REPORT"
         KIMI_EXTRA_ARGS="$_saved_args"
 
         if [[ ! -f "$QA_REPORT" ]]; then
           echo "  WARNING: QA report not written. Treating as FAIL."
         fi
 
-        verdict="$(check_qa_passed "$QA_REPORT")"
+        verdict="$(check_qa_passed "$QA_REPORT" || echo false)"
         if [[ "$verdict" == "true" ]]; then
           PASSED=true
           echo ""
@@ -337,7 +416,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
 
           # Overtime: grant extra round if <=2 bugs remain
           if (( qa_round == EFFECTIVE_MAX_QA && EFFECTIVE_MAX_QA == MAX_QA_ROUNDS )); then
-            remaining="$(count_bugs_in_report "$QA_REPORT")"
+            remaining="$(count_bugs_in_report "$QA_REPORT" || echo 0)"
             if (( remaining > 0 && remaining <= 2 )); then
               EFFECTIVE_MAX_QA=$(( EFFECTIVE_MAX_QA + 1 ))
               echo "  ⏱ Overtime: only ${remaining} bug(s) left — granting 1 extra round."
@@ -401,10 +480,11 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
     sleep 5
 
     prompt="$(render_reviewer_prompt "$CURRENT_EPOCH")"
-    run_kimi_with_browser "Product Reviewer Epoch ${CURRENT_EPOCH}" "$prompt"
+    run_kimi_with_browser "Product Reviewer Epoch ${CURRENT_EPOCH}" "$prompt" "$REVIEW_FILE"
 
     if [[ ! -f "$REVIEW_FILE" ]]; then
-      echo "  WARNING: Product review not written. Skipping quality gate."
+      echo "  WARNING: Product review not written after ${KIMI_MAX_RETRIES} attempts."
+      echo "  Resume later with: $0 --resume"
       state_set phase "review_failed"
     fi
   else
@@ -416,8 +496,8 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
   # ════════════════════════════════════════════════════════════════
   QUALITY_SCORE="0"
   if [[ -f "$REVIEW_FILE" ]]; then
-    QUALITY_SCORE="$(extract_quality_score "$REVIEW_FILE")"
-    state_record_quality "$CURRENT_EPOCH" "$QUALITY_SCORE"
+    QUALITY_SCORE="$(extract_quality_score "$REVIEW_FILE" || echo 0)"
+    state_record_quality "$CURRENT_EPOCH" "$QUALITY_SCORE" || true
 
     echo ""
     echo "  ┌─────────────────────────────────────┐"
@@ -440,7 +520,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
 
   if [[ "$MEETS" != "true" && -f "$REVIEW_FILE" ]]; then
     state_set epoch_type "polish"
-    BACKLOG_COUNT="$(count_backlog_items "$REVIEW_FILE")"
+    BACKLOG_COUNT="$(count_backlog_items "$REVIEW_FILE" || echo 0)"
     echo "  Improvement backlog has ${BACKLOG_COUNT} items."
 
     while (( POLISH_ROUND < MAX_POLISH_ROUNDS )); do
@@ -455,7 +535,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
         state_set phase "polishing"
 
         prompt="$(render_polish_contract_prompt "$POLISH_ROUND" "$CURRENT_EPOCH" 5)"
-        run_kimi_no_browser "Polish Contract ${POLISH_ROUND}" "$prompt"
+        run_kimi_no_browser "Polish Contract ${POLISH_ROUND}" "$prompt" "$POLISH_CONTRACT"
 
         if [[ ! -f "$POLISH_CONTRACT" ]]; then
           echo "  WARNING: Polish contract not created. Skipping this polish round."
@@ -487,7 +567,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
 
         # Use reviewer but with updated epoch marker
         prompt="$(render_reviewer_prompt "${CURRENT_EPOCH}.${POLISH_ROUND}")"
-        run_kimi_with_browser "Re-review after Polish ${POLISH_ROUND}" "$prompt"
+        run_kimi_with_browser "Re-review after Polish ${POLISH_ROUND}" "$prompt" "$POLISH_REVIEW"
 
         # The reviewer might write to a different filename; check both
         if [[ ! -f "$POLISH_REVIEW" ]]; then
@@ -500,9 +580,9 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
 
       # ── Check if quality improved enough ─────────────────
       if [[ -f "$POLISH_REVIEW" ]]; then
-        NEW_SCORE="$(extract_quality_score "$POLISH_REVIEW")"
+        NEW_SCORE="$(extract_quality_score "$POLISH_REVIEW" || echo 0)"
         PRE_POLISH_SCORE="$QUALITY_SCORE"
-        state_record_quality "${CURRENT_EPOCH}.${POLISH_ROUND}" "$NEW_SCORE"
+        state_record_quality "${CURRENT_EPOCH}.${POLISH_ROUND}" "$NEW_SCORE" || true
         QUALITY_SCORE="$NEW_SCORE"
 
         echo ""
@@ -526,7 +606,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
   # ════════════════════════════════════════════════════════════════
   #  PHASE 6: CHECK GOAL QUEUE (Evolution)
   # ════════════════════════════════════════════════════════════════
-  NEXT_GOAL="$(state_pop_goal)"
+  NEXT_GOAL="$(state_pop_goal || echo "")"
   if [[ -n "$NEXT_GOAL" ]]; then
     log_phase "EVOLUTION" "New goal from queue: ${NEXT_GOAL}"
     state_set epoch_type "evolve"

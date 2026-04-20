@@ -5,25 +5,65 @@
 # This prevents CDP port conflicts and user-data-dir locks that cause deadlocks
 # when the next Kimi + Playwright MCP session starts.
 kill_playwright() {
-  local killed=0
+  local killed=0 pids_to_kill=()
 
-  # Playwright MCP spawns: node (MCP server) → chromium/chrome (browser).
-  # We kill both layers. The patterns are intentionally broad enough to catch
-  # headless Chromium launched by @playwright/mcp, but narrow enough to avoid
-  # killing the user's regular browser (we match only --remote-debugging or
-  # --headless flags that Playwright injects).
+  # Collect PIDs: Playwright MCP node processes + headless Chromium instances.
+  # Case-insensitive match (-i) catches both Chromium and chromium.
   while IFS= read -r pid; do
-    kill "$pid" 2>/dev/null && killed=$(( killed + 1 ))
-  done < <(pgrep -f '@playwright/mcp' 2>/dev/null || true)
+    pids_to_kill+=("$pid")
+  done < <(pgrep -if '@playwright/mcp|playwright.*mcp' 2>/dev/null || true)
 
   while IFS= read -r pid; do
-    kill "$pid" 2>/dev/null && killed=$(( killed + 1 ))
-  done < <(pgrep -f 'chromium.*--remote-debugging|chrome.*--headless.*--remote-debugging' 2>/dev/null || true)
+    pids_to_kill+=("$pid")
+  done < <(pgrep -if 'chromium.*--remote-debugging|chrome.*--headless.*--remote-debugging' 2>/dev/null || true)
 
-  if (( killed > 0 )); then
-    echo "  [cleanup] Killed ${killed} Playwright/Chromium process(es). Waiting for ports to release..."
-    sleep 3
+  if (( ${#pids_to_kill[@]} == 0 )); then
+    return 0
   fi
+
+  # SIGTERM first
+  for pid in "${pids_to_kill[@]}"; do
+    kill "$pid" 2>/dev/null && killed=$(( killed + 1 ))
+  done
+
+  echo "  [cleanup] Sent SIGTERM to ${killed} Playwright/Chromium process(es)."
+  sleep 2
+
+  # SIGKILL any survivors
+  local still_alive=0
+  for pid in "${pids_to_kill[@]}"; do
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+      still_alive=$(( still_alive + 1 ))
+    fi
+  done
+  if (( still_alive > 0 )); then
+    echo "  [cleanup] Force-killed ${still_alive} stubborn process(es)."
+    sleep 1
+  fi
+
+  # Verify CDP port 9222 is free (common Playwright debug port)
+  if lsof -ti :9222 >/dev/null 2>&1; then
+    echo "  [cleanup] WARNING: Port 9222 still occupied after cleanup."
+    lsof -ti :9222 2>/dev/null | xargs kill -9 2>/dev/null || true
+    sleep 1
+  fi
+}
+
+# Wait for a URL to become reachable (up to max_attempts * 2 seconds).
+wait_for_url() {
+  local url="$1" label="$2" max_attempts="${3:-5}"
+  local attempt=0
+  while (( attempt < max_attempts )); do
+    attempt=$(( attempt + 1 ))
+    if curl -s -o /dev/null -w '' --max-time 3 "$url" 2>/dev/null; then
+      echo "  [restart] ${label} up (attempt ${attempt})"
+      return 0
+    fi
+    sleep 2
+  done
+  echo "  [restart] WARNING: ${label} not reachable after ${max_attempts} attempts"
+  return 1
 }
 
 restart_backend() {
@@ -48,13 +88,8 @@ restart_backend() {
     nohup python3 -m uvicorn main:app --host 127.0.0.1 --port 8000 \
       > "$log_file" 2>&1 &
   )
-  sleep 3
 
-  if curl -s -o /dev/null -w '' --max-time 5 http://127.0.0.1:8000/docs 2>/dev/null; then
-    echo "  [restart] Backend up on :8000"
-  else
-    echo "  [restart] WARNING: Backend may not be ready (curl failed)"
-  fi
+  wait_for_url "http://127.0.0.1:8000/docs" "Backend :8000" 5 || true
 }
 
 restart_frontend() {
@@ -76,13 +111,14 @@ restart_frontend() {
     cd "$project_dir"
     nohup npm run dev > "$log_file" 2>&1 &
   )
-  sleep 5
 
-  if curl -s -o /dev/null -w '' --max-time 5 http://localhost:5173/ 2>/dev/null; then
-    echo "  [restart] Frontend up on :5173"
-  else
-    echo "  [restart] WARNING: Frontend may not be ready (curl failed)"
-  fi
+  wait_for_url "http://localhost:5173/" "Frontend :5173" 8 || true
+}
+
+# Ensure both backend and frontend are running with fresh code.
+restart_all() {
+  restart_backend
+  restart_frontend
 }
 
 count_bugs_in_report() {
