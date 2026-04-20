@@ -1,6 +1,31 @@
 #!/usr/bin/env bash
 # lib/restart-servers.sh — Restart backend/frontend so Evaluator tests fresh code
 
+# Kill any leftover Playwright / Chromium processes from a previous MCP session.
+# This prevents CDP port conflicts and user-data-dir locks that cause deadlocks
+# when the next Kimi + Playwright MCP session starts.
+kill_playwright() {
+  local killed=0
+
+  # Playwright MCP spawns: node (MCP server) → chromium/chrome (browser).
+  # We kill both layers. The patterns are intentionally broad enough to catch
+  # headless Chromium launched by @playwright/mcp, but narrow enough to avoid
+  # killing the user's regular browser (we match only --remote-debugging or
+  # --headless flags that Playwright injects).
+  while IFS= read -r pid; do
+    kill "$pid" 2>/dev/null && killed=$(( killed + 1 ))
+  done < <(pgrep -f '@playwright/mcp' 2>/dev/null || true)
+
+  while IFS= read -r pid; do
+    kill "$pid" 2>/dev/null && killed=$(( killed + 1 ))
+  done < <(pgrep -f 'chromium.*--remote-debugging|chrome.*--headless.*--remote-debugging' 2>/dev/null || true)
+
+  if (( killed > 0 )); then
+    echo "  [cleanup] Killed ${killed} Playwright/Chromium process(es). Waiting for ports to release..."
+    sleep 3
+  fi
+}
+
 restart_backend() {
   local backend_dir="${ROOT}/project/backend"
   local log_file="/tmp/harness-logs/backend.log"

@@ -46,6 +46,8 @@ HARNESS_START_TIME="$(date +%s)"
 # ── Log setup ────────────────────────────────────────────────────
 LOG_DIR="/tmp/harness-logs"
 mkdir -p "$LOG_DIR" artifacts project prompts/templates
+# Generator Fix uses this to disable MCP (see QA loop). Must exist or Kimi may behave inconsistently.
+printf '%s\n' '{"mcpServers":{}}' > /tmp/empty-mcp.json
 
 # ── Graceful interrupt ───────────────────────────────────────────
 cleanup() {
@@ -70,6 +72,23 @@ run_kimi() {
   t_end="$(date +%s)"
   elapsed=$(( t_end - t_start ))
   echo "  [kimi] ${label} — done in $(( elapsed / 60 ))m $(( elapsed % 60 ))s"
+}
+
+# Agents that need Playwright MCP (Evaluator, Reviewer).
+# Kills leftover browsers first to prevent CDP / lock conflicts.
+run_kimi_with_browser() {
+  kill_playwright
+  run_kimi "$@"
+}
+
+# Agents that do NOT need the browser (Planner, Generator, Contract, Polish, Evolution).
+# Disables MCP entirely so Kimi won't start Playwright, avoiding pointless process
+# creation and the main source of deadlocks.
+run_kimi_no_browser() {
+  local _saved_args="$KIMI_EXTRA_ARGS"
+  KIMI_EXTRA_ARGS="$KIMI_EXTRA_ARGS --mcp-config-file /tmp/empty-mcp.json"
+  run_kimi "$@"
+  KIMI_EXTRA_ARGS="$_saved_args"
 }
 
 # ══════════════════════════════════════════════════════════════════
@@ -188,7 +207,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
     state_set epoch_type "build"
 
     prompt="$(render_planner_prompt "$USER_GOAL")"
-    run_kimi "Planner" "$prompt"
+    run_kimi_no_browser "Planner" "$prompt"
 
     if [[ ! -f artifacts/spec.md ]]; then
       echo "ERROR: Planner did not create artifacts/spec.md" >&2
@@ -241,11 +260,11 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
 
         sprint_section="$(extract_sprint_section "$sprint")"
         prompt="$(render_contract_prompt "$sprint" "$sprint_section")"
-        run_kimi "Contract Sprint ${sprint}" "$prompt"
+        run_kimi_no_browser "Contract Sprint ${sprint}" "$prompt"
 
         if [[ ! -f "$CONTRACT_FILE" ]]; then
           echo "  WARNING: Contract file not created. Retrying once..."
-          run_kimi "Contract Sprint ${sprint} (retry)" "$prompt"
+          run_kimi_no_browser "Contract Sprint ${sprint} (retry)" "$prompt"
         fi
         if [[ ! -f "$CONTRACT_FILE" ]]; then
           echo "  WARNING: Contract still not created. Using draft if available."
@@ -269,7 +288,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
         state_set phase "building"
 
         prompt="$(render_generator_prompt "$sprint")"
-        run_kimi "Generator Sprint ${sprint}" "$prompt"
+        run_kimi_no_browser "Generator Sprint ${sprint}" "$prompt"
       else
         echo "  [SKIP] Sprint ${sprint} generator already ran (handoff or QA exists)."
       fi
@@ -297,11 +316,10 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
         state_set phase "qa"
 
         prompt="$(render_evaluator_prompt "$sprint" "$qa_round")"
-        # Increase step limit so Evaluator has time to write the full QA report
-        _old_args="$KIMI_EXTRA_ARGS"
+        _saved_args="$KIMI_EXTRA_ARGS"
         KIMI_EXTRA_ARGS="$KIMI_EXTRA_ARGS --max-steps-per-turn 100"
-        run_kimi "Evaluator Sprint ${sprint} R${qa_round}" "$prompt"
-        KIMI_EXTRA_ARGS="$_old_args"
+        run_kimi_with_browser "Evaluator Sprint ${sprint} R${qa_round}" "$prompt"
+        KIMI_EXTRA_ARGS="$_saved_args"
 
         if [[ ! -f "$QA_REPORT" ]]; then
           echo "  WARNING: QA report not written. Treating as FAIL."
@@ -331,11 +349,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
             state_set phase "qa_fix"
 
             prompt="$(render_generator_fix_prompt "$sprint" "$qa_round")"
-            # Disable MCP for Generator Fix to avoid Playwright initialization deadlock
-            _old_args="$KIMI_EXTRA_ARGS"
-            KIMI_EXTRA_ARGS="$KIMI_EXTRA_ARGS --mcp-config-file /tmp/empty-mcp.json"
-            run_kimi "Generator Fix Sprint ${sprint} R${qa_round}" "$prompt"
-            KIMI_EXTRA_ARGS="$_old_args"
+            run_kimi_no_browser "Generator Fix Sprint ${sprint} R${qa_round}" "$prompt"
 
             rm -f "$HANDOFF_FILE"
           fi
@@ -387,7 +401,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
     sleep 5
 
     prompt="$(render_reviewer_prompt "$CURRENT_EPOCH")"
-    run_kimi "Product Reviewer Epoch ${CURRENT_EPOCH}" "$prompt"
+    run_kimi_with_browser "Product Reviewer Epoch ${CURRENT_EPOCH}" "$prompt"
 
     if [[ ! -f "$REVIEW_FILE" ]]; then
       echo "  WARNING: Product review not written. Skipping quality gate."
@@ -441,7 +455,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
         state_set phase "polishing"
 
         prompt="$(render_polish_contract_prompt "$POLISH_ROUND" "$CURRENT_EPOCH" 5)"
-        run_kimi "Polish Contract ${POLISH_ROUND}" "$prompt"
+        run_kimi_no_browser "Polish Contract ${POLISH_ROUND}" "$prompt"
 
         if [[ ! -f "$POLISH_CONTRACT" ]]; then
           echo "  WARNING: Polish contract not created. Skipping this polish round."
@@ -455,7 +469,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
         state_set phase "polish_build"
 
         prompt="$(render_polish_generator_prompt "$POLISH_ROUND" "$CURRENT_EPOCH")"
-        run_kimi "Polish Generator ${POLISH_ROUND}" "$prompt"
+        run_kimi_no_browser "Polish Generator ${POLISH_ROUND}" "$prompt"
       fi
 
       # ── Git commit for polish ────────────────────────────
@@ -473,7 +487,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
 
         # Use reviewer but with updated epoch marker
         prompt="$(render_reviewer_prompt "${CURRENT_EPOCH}.${POLISH_ROUND}")"
-        run_kimi "Re-review after Polish ${POLISH_ROUND}" "$prompt"
+        run_kimi_with_browser "Re-review after Polish ${POLISH_ROUND}" "$prompt"
 
         # The reviewer might write to a different filename; check both
         if [[ ! -f "$POLISH_REVIEW" ]]; then
@@ -534,7 +548,7 @@ Read the current spec and the existing code under project/. Then:
 
 IMPORTANT: Actually modify artifacts/spec.md. Do NOT just describe the changes."
 
-    run_kimi "Evolution Planner: ${NEXT_GOAL}" "$EVOLUTION_PROMPT"
+    run_kimi_no_browser "Evolution Planner: ${NEXT_GOAL}" "$EVOLUTION_PROMPT"
 
     # Re-parse sprint count and continue the build loop
     TOTAL_SPRINTS="$(parse_sprint_count)"
