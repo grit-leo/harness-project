@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { BookmarkCard } from "./components/BookmarkCard";
 import { FilterBar } from "./components/FilterBar";
 import { BookmarkModal } from "./components/BookmarkModal";
+import { DigestPopover } from "./components/DigestPopover";
+import { MobileNav } from "./components/MobileNav";
+import { useToast } from "./components/Toast";
 import { useBookmarkFilter } from "./hooks/useBookmarkFilter";
 import { useAuth } from "./context/AuthContext";
 import {
@@ -24,6 +27,8 @@ function App() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
   const { logout } = useAuth();
+  const location = useLocation();
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -69,26 +74,54 @@ function App() {
     if (!confirm("Are you sure you want to delete this bookmark?")) return;
     try {
       await deleteBookmark(bookmark.id);
+      toastSuccess("Bookmark deleted");
       await loadData();
     } catch (err: any) {
+      toastError(err.message || "Failed to delete bookmark");
+      setError(err.message || "Failed to delete bookmark");
+    }
+  };
+
+  const handleModalDelete = async (bookmark: Bookmark) => {
+    try {
+      await deleteBookmark(bookmark.id);
+      toastSuccess("Bookmark deleted");
+      setModalOpen(false);
+      setEditingBookmark(null);
+      await loadData();
+    } catch (err: any) {
+      toastError(err.message || "Failed to delete bookmark");
       setError(err.message || "Failed to delete bookmark");
     }
   };
 
   const handleModalSubmit = async (payload: BookmarkCreate) => {
-    if (editingBookmark) {
-      await updateBookmark(editingBookmark.id, payload);
-    } else {
-      await createBookmark(payload);
+    try {
+      if (editingBookmark) {
+        await updateBookmark(editingBookmark.id, payload);
+        toastSuccess("Changes saved");
+      } else {
+        await createBookmark(payload);
+        toastSuccess("Bookmark saved");
+      }
+      await loadData();
+      setModalOpen(false);
+      setEditingBookmark(null);
+    } catch (err: any) {
+      toastError(err.message || "Failed to save bookmark");
+      setError(err.message || "Failed to save bookmark");
     }
-    await loadData();
-    setModalOpen(false);
-    setEditingBookmark(null);
   };
 
   const handleApplyTags = async (id: string, tags: string[]) => {
-    await applyTags(id, tags);
-    await loadData();
+    try {
+      await applyTags(id, tags);
+      toastSuccess("Tags updated");
+      await loadData();
+    } catch (err: any) {
+      toastError(err.message || "Failed to update tags");
+      setError(err.message || "Failed to update tags");
+    }
   };
 
   return (
@@ -123,20 +156,46 @@ function App() {
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
+              to="/"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
+            >
+              Library
+            </Link>
+            <Link
               to="/collections"
-              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200 sm:block"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/collections"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
             >
               Collections
             </Link>
             <Link
               to="/discover"
-              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200 sm:block"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/discover"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
             >
               Discover
             </Link>
             <Link
               to="/settings"
-              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200 sm:block"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/settings"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
             >
               Settings
             </Link>
@@ -146,9 +205,10 @@ function App() {
             >
               Add bookmark
             </button>
+            <DigestPopover />
             <button
               onClick={logout}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200 sm:block"
               title="Log out"
             >
               <svg
@@ -166,6 +226,7 @@ function App() {
                 />
               </svg>
             </button>
+            <MobileNav />
           </div>
         </div>
       </header>
@@ -259,6 +320,7 @@ function App() {
         }}
         onSubmit={handleModalSubmit}
         onApplyTags={editingBookmark ? handleApplyTags : undefined}
+        onDelete={editingBookmark ? handleModalDelete : undefined}
         initialData={editingBookmark}
       />
     </div>

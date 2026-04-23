@@ -1,14 +1,20 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { DigestPopover } from "../components/DigestPopover";
+import { MobileNav } from "../components/MobileNav";
+import { useToast } from "../components/Toast";
 import { fetchDiscovery, followPublicCollection, type DiscoveryItem } from "../api/client";
 
 export function DiscoveryPage() {
+  const location = useLocation();
   const { logout } = useAuth();
+  const { success: toastSuccess, error: toastError } = useToast();
   const [items, setItems] = useState<DiscoveryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [following, setFollowing] = useState<Set<string>>(new Set());
+  const [loadingFollowId, setLoadingFollowId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -25,8 +31,10 @@ export function DiscoveryPage() {
   }, []);
 
   const handleFollow = async (item: DiscoveryItem) => {
+    setLoadingFollowId(item.id);
     try {
       await followPublicCollection(item.shareToken);
+      toastSuccess("You are now following this collection");
       setFollowing((prev) => new Set(prev).add(item.id));
       setItems((prev) =>
         prev.map((i) =>
@@ -34,7 +42,10 @@ export function DiscoveryPage() {
         )
       );
     } catch (err: any) {
+      toastError(err.message || "Failed to follow");
       setError(err.message || "Failed to follow");
+    } finally {
+      setLoadingFollowId(null);
     }
   };
 
@@ -72,22 +83,55 @@ export function DiscoveryPage() {
               <p className="text-xs text-slate-500">Discover</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               to="/"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
             >
               Library
             </Link>
             <Link
               to="/collections"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/collections"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
             >
               Collections
             </Link>
+            <Link
+              to="/discover"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/discover"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
+            >
+              Discover
+            </Link>
+            <Link
+              to="/settings"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/settings"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
+            >
+              Settings
+            </Link>
+            <DigestPopover />
             <button
               onClick={logout}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200 sm:block"
               title="Log out"
             >
               <svg
@@ -105,6 +149,7 @@ export function DiscoveryPage() {
                 />
               </svg>
             </button>
+            <MobileNav />
           </div>
         </div>
       </header>
@@ -171,15 +216,18 @@ export function DiscoveryPage() {
                   </Link>
                   <button
                     onClick={() => handleFollow(item)}
-                    disabled={following.has(item.id)}
+                    disabled={following.has(item.id) || loadingFollowId === item.id}
                     className={[
-                      "rounded-lg px-3 py-2 text-xs font-medium transition-colors",
+                      "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
                       following.has(item.id)
                         ? "bg-emerald-500/10 text-emerald-400 cursor-default"
                         : "bg-indigo-500 text-white hover:bg-indigo-600",
                     ].join(" ")}
                   >
-                    {following.has(item.id) ? "Following" : "Follow"}
+                    {loadingFollowId === item.id && (
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    )}
+                    {following.has(item.id) ? "Following" : loadingFollowId === item.id ? "Following…" : "Follow"}
                   </button>
                 </div>
               </div>

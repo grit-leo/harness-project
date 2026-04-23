@@ -1964,11 +1964,13 @@ Evaluator 需要浏览器工具时，在 Kimi 侧通过 MCP 配置（默认可�
   "mcpServers": {
     "playwright": {
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"]
+      "args": ["-y", "@playwright/mcp@latest", "--isolated"]
     }
   }
 }
 ```
+
+若出现 **「Browser is already in use for … mcp-chrome-…」**，通常是因为多个 MCP / Kimi 会话共用同一磁盘上的浏览器 profile。解决办法：**在 `args` 末尾加上 `--isolated`**（内存隔离会话，不抢同一 profile），或确保同一时刻只跑一个 Playwright MCP、并在新会话前结束残留 `playwright-mcp` / Chromium 进程。本仓库的 `harness-kimi-demo/config/playwright-mcp-isolated.json` 已按此方式配置，并由 `run-harness-full.sh` 在 Evaluator / Reviewer 阶段通过 `--mcp-config-file` 引用。
 
 配置好后，在 Evaluator 阶段的 Prompt 中明确要求：**使用 Playwright MCP 打开 `http://localhost:5173`（及 API 根路径），按 contract 逐条验收**，并把报告写入 `artifacts/sprint-N-qa-round-R.md`。
 
@@ -2595,5 +2597,4 @@ Project Data Model: Each project contains:
 5. [Playwright MCP](https://github.com/anthropics/anthropic-tools/tree/main/playwright-mcp) — Anthropic Tools
 
 ---
-
 *本文档基于 Anthropic Engineering 公开博客整理，结合实际落地需求形成可执行方案。V2 Multi-Epoch Evolution 架构于 2026-04-19 新增。最后更新：2026-04-19。*

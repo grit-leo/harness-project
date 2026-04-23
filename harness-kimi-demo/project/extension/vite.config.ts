@@ -9,7 +9,7 @@ export default defineConfig({
     outDir: 'dist',
     rollupOptions: {
       input: {
-        popup: './index.html',
+        popup: './popup.html',
         background: './src/background.ts',
         content: './src/content.ts',
       },

@@ -43,7 +43,7 @@ DEFAULT_COLLECTIONS = [
         "name": "Recent Reads",
         "rules_json": {
             "operator": "AND",
-            "conditions": [{"field": "domain", "op": "equals", "value": "github.com"}],
+            "conditions": [{"field": "date", "op": "last_n_days", "value": 30}],
         },
         "is_default": True,
     },
@@ -54,6 +54,27 @@ def _seed_default_collections(db: Session, user_id: str):
     for data in DEFAULT_COLLECTIONS:
         coll = Collection(user_id=user_id, **data)
         db.add(coll)
+    db.commit()
+
+
+def _ensure_default_collections(db: Session, user_id: str):
+    """Ensure the user has all default collections. Creates missing ones and updates outdated rules."""
+    existing_defaults = {
+        c.name: c
+        for c in db.query(Collection).filter(
+            Collection.user_id == user_id, Collection.is_default == True
+        ).all()
+    }
+
+    for data in DEFAULT_COLLECTIONS:
+        coll = existing_defaults.get(data["name"])
+        if not coll:
+            coll = Collection(user_id=user_id, **data)
+            db.add(coll)
+        else:
+            # Update rule if it differs from the canonical default
+            if coll.rules_json != data["rules_json"]:
+                coll.rules_json = data["rules_json"]
     db.commit()
 
 
@@ -77,6 +98,7 @@ def login(payload: UserCreate, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    _ensure_default_collections(db, user.id)
     access_token = create_access_token({"sub": user.id})
     refresh_token = create_refresh_token({"sub": user.id})
     return {"access_token": access_token, "refresh_token": refresh_token}

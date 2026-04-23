@@ -1,6 +1,8 @@
+import time
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File
 from fastapi.responses import StreamingResponse, JSONResponse
+from pydantic import BaseModel, HttpUrl, field_validator
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import get_current_user
@@ -14,9 +16,11 @@ from app.schemas.bookmark import (
     BookmarkUpdate,
     BookmarkOut,
     SuggestedTagsOut,
+    SuggestTagsPayload,
     ApplyTagsPayload,
 )
 from app.services import ai_service
+from app.services.metadata_service import fetch_metadata
 from app.services.netscape_parser import parse_netscape_html
 from app.services.netscape_exporter import bookmarks_to_netscape_html
 from app.services.import_task import create_task, run_import_task, get_task
@@ -24,6 +28,38 @@ from app.services.digest_service import generate_digest_items
 import json
 
 router = APIRouter(prefix="/api/bookmarks", tags=["bookmarks"])
+
+# Simple in-memory rate limiter for fetch-metadata: max 10 requests per 60 seconds per user
+_rate_limit_store: dict[str, list[float]] = {}
+
+
+def _check_rate_limit(user_id: str, max_requests: int = 10, window_seconds: int = 60) -> bool:
+    now = time.time()
+    timestamps = _rate_limit_store.get(user_id, [])
+    # Keep only timestamps within the window
+    timestamps = [t for t in timestamps if now - t < window_seconds]
+    _rate_limit_store[user_id] = timestamps
+    if len(timestamps) >= max_requests:
+        return False
+    timestamps.append(now)
+    return True
+
+
+class FetchMetadataPayload(BaseModel):
+    url: str
+
+    @field_validator("url")
+    @classmethod
+    def validate_url_scheme(cls, v: str) -> str:
+        if not v.startswith("http://") and not v.startswith("https://"):
+            raise ValueError("URL must start with http:// or https://")
+        return v
+
+
+class MetadataFetchResponse(BaseModel):
+    title: str
+    description: str
+    thumbnail_url: str | None = None
 
 
 def ensure_tags(db: Session, user: User, tag_names: List[str]) -> List[Tag]:
@@ -106,6 +142,7 @@ def create_bookmark(
         url=str(payload.url),
         title=payload.title,
         summary=payload.summary or "",
+        thumbnail_url=payload.thumbnail_url,
     )
     db.add(bookmark)
     db.flush()
@@ -119,26 +156,68 @@ def create_bookmark(
     return bookmark
 
 
+@router.post("/fetch-metadata", response_model=MetadataFetchResponse)
+def fetch_metadata_endpoint(
+    payload: FetchMetadataPayload,
+    current_user: User = Depends(get_current_user),
+):
+    if not _check_rate_limit(current_user.id, max_requests=10, window_seconds=60):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Rate limit exceeded. Try again later.",
+        )
+    result = fetch_metadata(payload.url)
+    return result
+
+
 @router.post("/suggest-tags", response_model=SuggestedTagsOut)
 def suggest_tags(
-    payload: dict,
+    payload: SuggestTagsPayload,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    url = payload.get("url", "")
-    title = payload.get("title", "")
-    if not url:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="url is required")
-    result = ai_service.fetch_and_enrich(url)
-    suggested = result.get("tags", [])
-    if not suggested and title:
-        # Fallback: derive a tag from domain
-        from urllib.parse import urlparse
-        hostname = urlparse(url).hostname or ""
+    import re
+    from urllib.parse import urlparse
+
+    if payload.url:
+        suggested = ai_service.suggest_tags_for_url(payload.url)
+        if not suggested:
+            suggested = ai_service.suggest_tags_from_text(payload.title, payload.summary)
+    else:
+        suggested = ai_service.suggest_tags_from_text(payload.title, payload.summary)
+
+    # Normalize: lowercase, alphanumeric + hyphens only
+    normalized: list[str] = []
+    for tag in suggested:
+        tag = tag.lower().strip()
+        tag = re.sub(r"[^a-z0-9]+", "-", tag)
+        tag = tag.strip("-")
+        if tag and tag not in normalized:
+            normalized.append(tag)
+
+    # Enforce 3–5 tags
+    if len(normalized) < 3:
+        words = re.findall(r"[a-z0-9]+", payload.title.lower())
+        for w in words:
+            if w not in normalized and len(w) > 1:
+                normalized.append(w)
+            if len(normalized) >= 3:
+                break
+    if len(normalized) < 3 and payload.url:
+        hostname = urlparse(payload.url).hostname or ""
         hostname = hostname.replace("www.", "").split(".")[0]
-        if hostname:
-            suggested = [hostname]
-    return {"suggested_tags": suggested}
+        if hostname and hostname not in normalized:
+            normalized.append(hostname)
+    if len(normalized) < 3:
+        for g in ("reference", "article", "link"):
+            if g not in normalized:
+                normalized.append(g)
+            if len(normalized) >= 3:
+                break
+
+    normalized = normalized[:5]
+
+    return {"suggested_tags": normalized}
 
 
 @router.get("/{bookmark_id}/suggested-tags", response_model=SuggestedTagsOut)
@@ -189,6 +268,8 @@ def update_bookmark(
         bookmark.title = payload.title
     if payload.summary is not None:
         bookmark.summary = payload.summary
+    if payload.thumbnail_url is not None:
+        bookmark.thumbnail_url = payload.thumbnail_url
     if payload.tags is not None:
         # Ensure tags belong to the bookmark owner
         owner = db.query(User).filter(User.id == bookmark.user_id).first()
@@ -333,3 +414,15 @@ def export_bookmarks(
         media_type="application/json",
         headers={"Content-Disposition": 'attachment; filename="lumina-bookmarks.json"'},
     )
+
+
+@router.get("/{bookmark_id}", response_model=BookmarkOut)
+def get_bookmark(
+    bookmark_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    bookmark = db.query(Bookmark).filter(Bookmark.id == bookmark_id, Bookmark.user_id == current_user.id).first()
+    if not bookmark:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bookmark not found")
+    return bookmark

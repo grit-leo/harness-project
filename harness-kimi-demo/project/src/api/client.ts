@@ -6,6 +6,7 @@ export interface Bookmark {
   url: string;
   tags: string[];
   summary: string;
+  thumbnailUrl?: string;
   suggestedTags?: string[];
   createdAt: string;
   updatedAt: string;
@@ -16,6 +17,7 @@ export interface BookmarkCreate {
   title: string;
   summary?: string;
   tags?: string[];
+  thumbnailUrl?: string;
 }
 
 export interface BookmarkUpdate {
@@ -23,6 +25,7 @@ export interface BookmarkUpdate {
   title?: string;
   summary?: string;
   tags?: string[];
+  thumbnailUrl?: string;
 }
 
 export interface Tag {
@@ -101,6 +104,20 @@ export interface AuthTokens {
 
 let accessToken: string | null = localStorage.getItem("accessToken");
 let refreshTokenValue: string | null = localStorage.getItem("refreshToken");
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleProactiveRefresh() {
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+  // Refresh 1 minute before the 15-minute access token expiry
+  refreshTimer = setTimeout(() => {
+    refreshAccessToken().then((ok) => {
+      if (ok) scheduleProactiveRefresh();
+    });
+  }, 14 * 60 * 1000);
+}
 
 export function setTokens(tokens: AuthTokens) {
   accessToken = tokens.access_token;
@@ -109,6 +126,7 @@ export function setTokens(tokens: AuthTokens) {
   localStorage.setItem("refreshToken", refreshTokenValue);
   // Broadcast to extension
   window.postMessage({ type: "LUMINA_SET_TOKEN", token: tokens.access_token }, "*");
+  scheduleProactiveRefresh();
 }
 
 export function clearTokens() {
@@ -117,6 +135,10 @@ export function clearTokens() {
   localStorage.removeItem("accessToken");
   localStorage.removeItem("refreshToken");
   window.postMessage({ type: "LUMINA_CLEAR_TOKEN" }, "*");
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
 }
 
 export function getAccessToken(): string | null {
@@ -433,7 +455,10 @@ export async function importBookmarks(file: File): Promise<{ imported?: number; 
     },
     body: formData,
   });
-  if (!res.ok) throw new Error("Import failed");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Import failed" }));
+    throw new Error(err.detail || "Import failed");
+  }
   return res.json();
 }
 
@@ -449,10 +474,28 @@ export async function exportBookmarks(format: "json" | "netscape"): Promise<Blob
   return res.blob();
 }
 
-export async function fetchSuggestedTagsForUrl(url: string, title: string): Promise<string[]> {
+export interface MetadataFetchResponse {
+  title: string;
+  description: string;
+  thumbnail_url: string | null;
+}
+
+export async function fetchMetadata(url: string): Promise<MetadataFetchResponse> {
+  const res = await apiFetch("/api/bookmarks/fetch-metadata", {
+    method: "POST",
+    body: JSON.stringify({ url }),
+  });
+  if (!res.ok) {
+    // Silently fail for metadata fetch — return empty result
+    return { title: "", description: "", thumbnail_url: null };
+  }
+  return res.json();
+}
+
+export async function fetchSuggestedTagsForUrl(url: string, title: string, summary?: string): Promise<string[]> {
   const res = await apiFetch("/api/bookmarks/suggest-tags", {
     method: "POST",
-    body: JSON.stringify({ url, title }),
+    body: JSON.stringify({ url, title, summary }),
   });
   if (!res.ok) throw new Error("Failed to fetch suggested tags");
   const data = await res.json();

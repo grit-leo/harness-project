@@ -21,10 +21,10 @@ def discover_collections(
     # Get current user's tags
     user_tags = {t.name for t in db.query(Tag).filter(Tag.user_id == current_user.id).all()}
 
-    # Get public collections with follower counts
+    # Get public collections with follower counts (only those with an active share token)
     public_collections = (
         db.query(Collection)
-        .filter(Collection.visibility == "public_readonly")
+        .filter(Collection.visibility == "public_readonly", Collection.share_token.isnot(None))
         .all()
     )
 

@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { BookmarkCard } from "../components/BookmarkCard";
 import { BookmarkModal } from "../components/BookmarkModal";
+import { DigestPopover } from "../components/DigestPopover";
+import { MobileNav } from "../components/MobileNav";
+import { useToast } from "../components/Toast";
 import {
   fetchCollections,
   fetchCollectionBookmarks,
@@ -10,6 +13,9 @@ import {
   deleteCollection,
   updateCollection,
   createBookmark,
+  updateBookmark,
+  deleteBookmark,
+  applyTags,
   shareCollection,
   unshareCollection,
   fetchCollaborators,
@@ -24,7 +30,9 @@ import {
 
 export function CollectionsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout } = useAuth();
+  const { success: toastSuccess, error: toastError } = useToast();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
@@ -37,12 +45,18 @@ export function CollectionsPage() {
   const [builderConditions, setBuilderConditions] = useState<Condition[]>([
     { field: "tag", op: "equals", value: "" },
   ]);
+  const [builderSubmitting, setBuilderSubmitting] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
 
   // Collaborator state
   const [collabPanelOpen, setCollabPanelOpen] = useState(false);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   // Live indicator
   const [live, setLive] = useState(false);
@@ -51,8 +65,8 @@ export function CollectionsPage() {
     try {
       const data = await fetchCollections();
       setCollections(data);
-      if (data.length && !selectedId) {
-        setSelectedId(data[0].id);
+      if (data.length) {
+        setSelectedId((prev) => prev ?? data[0].id);
       }
     } catch (err: any) {
       setError(err.message || "Failed to load collections");
@@ -63,6 +77,8 @@ export function CollectionsPage() {
 
   useEffect(() => {
     loadCollections();
+    const interval = setInterval(loadCollections, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -110,6 +126,7 @@ export function CollectionsPage() {
       (c) => String(c.value).trim().length > 0
     );
     if (!builderName.trim() || validConditions.length === 0) return;
+    setBuilderSubmitting(true);
     try {
       const created = await createCollection({
         name: builderName.trim(),
@@ -118,6 +135,7 @@ export function CollectionsPage() {
           conditions: validConditions,
         },
       });
+      toastSuccess("Collection saved");
       setCollections((prev) => [created, ...prev]);
       setSelectedId(created.id);
       setBuilderOpen(false);
@@ -125,20 +143,103 @@ export function CollectionsPage() {
       setBuilderOperator("AND");
       setBuilderConditions([{ field: "tag", op: "equals", value: "" }]);
     } catch (err: any) {
+      toastError(err.message || "Failed to create collection");
       setError(err.message || "Failed to create collection");
+    } finally {
+      setBuilderSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteCollection = async (id: string) => {
     if (!confirm("Delete this collection?")) return;
+    setDeletingId(id);
     try {
       await deleteCollection(id);
+      toastSuccess("Collection deleted");
       setCollections((prev) => prev.filter((c) => c.id !== id));
       if (selectedId === id) {
         setSelectedId(null);
       }
     } catch (err: any) {
+      toastError(err.message || "Failed to delete collection");
       setError(err.message || "Failed to delete collection");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleEditBookmark = (bookmark: Bookmark) => {
+    setEditingBookmark(bookmark);
+    setModalOpen(true);
+  };
+
+  const handleDeleteBookmark = async (bookmark: Bookmark) => {
+    if (!confirm("Are you sure you want to delete this bookmark?")) return;
+    try {
+      await deleteBookmark(bookmark.id);
+      toastSuccess("Bookmark deleted");
+      if (selectedId) {
+        const data = await fetchCollectionBookmarks(selectedId);
+        setBookmarks(data);
+      }
+      await loadCollections();
+    } catch (err: any) {
+      toastError(err.message || "Failed to delete bookmark");
+      setError(err.message || "Failed to delete bookmark");
+    }
+  };
+
+  const handleModalDelete = async (bookmark: Bookmark) => {
+    try {
+      await deleteBookmark(bookmark.id);
+      toastSuccess("Bookmark deleted");
+      setModalOpen(false);
+      setEditingBookmark(null);
+      if (selectedId) {
+        const data = await fetchCollectionBookmarks(selectedId);
+        setBookmarks(data);
+      }
+      await loadCollections();
+    } catch (err: any) {
+      toastError(err.message || "Failed to delete bookmark");
+      setError(err.message || "Failed to delete bookmark");
+    }
+  };
+
+  const handleModalSubmit = async (payload: BookmarkCreate) => {
+    try {
+      if (editingBookmark) {
+        await updateBookmark(editingBookmark.id, payload);
+        toastSuccess("Changes saved");
+      } else {
+        await createBookmark(payload);
+        toastSuccess("Bookmark saved");
+      }
+      setModalOpen(false);
+      setEditingBookmark(null);
+      if (selectedId) {
+        const data = await fetchCollectionBookmarks(selectedId);
+        setBookmarks(data);
+      }
+      await loadCollections();
+    } catch (err: any) {
+      toastError(err.message || "Failed to save bookmark");
+      setError(err.message || "Failed to save bookmark");
+    }
+  };
+
+  const handleApplyTags = async (id: string, tags: string[]) => {
+    try {
+      await applyTags(id, tags);
+      toastSuccess("Tags updated");
+      if (selectedId) {
+        const data = await fetchCollectionBookmarks(selectedId);
+        setBookmarks(data);
+      }
+      await loadCollections();
+    } catch (err: any) {
+      toastError(err.message || "Failed to update tags");
+      setError(err.message || "Failed to update tags");
     }
   };
 
@@ -146,63 +247,85 @@ export function CollectionsPage() {
     if (!selectedCollection) return;
     try {
       const updated = await updateCollection(selectedCollection.id, { visibility });
+      toastSuccess("Visibility updated");
       setCollections((prev) =>
         prev.map((c) => (c.id === updated.id ? updated : c))
       );
     } catch (err: any) {
+      toastError(err.message || "Failed to update visibility");
       setError(err.message || "Failed to update visibility");
     }
   };
 
   const handleShare = async () => {
     if (!selectedCollection) return;
+    setSharing(true);
     try {
       const result = await shareCollection(selectedCollection.id);
+      toastSuccess("Share link generated");
       setCollections((prev) =>
         prev.map((c) =>
           c.id === selectedCollection.id ? { ...c, shareToken: result.share_token } : c
         )
       );
     } catch (err: any) {
+      toastError(err.message || "Failed to share collection");
       setError(err.message || "Failed to share collection");
+    } finally {
+      setSharing(false);
     }
   };
 
   const handleUnshare = async () => {
     if (!selectedCollection) return;
+    setSharing(true);
     try {
       await unshareCollection(selectedCollection.id);
+      toastSuccess("Share link revoked");
       setCollections((prev) =>
         prev.map((c) =>
           c.id === selectedCollection.id ? { ...c, shareToken: null } : c
         )
       );
     } catch (err: any) {
+      toastError(err.message || "Failed to revoke share link");
       setError(err.message || "Failed to revoke share link");
+    } finally {
+      setSharing(false);
     }
   };
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedId || !inviteEmail.trim()) return;
+    setInviting(true);
     try {
       await inviteCollaborator(selectedId, inviteEmail.trim());
+      toastSuccess("Invitation sent");
       setInviteEmail("");
       const data = await fetchCollaborators(selectedId);
       setCollaborators(data);
     } catch (err: any) {
+      toastError(err.message || "Failed to invite collaborator");
       setError(err.message || "Failed to invite collaborator");
+    } finally {
+      setInviting(false);
     }
   };
 
   const handleRemoveCollaborator = async (userId: string) => {
     if (!selectedId) return;
     if (!confirm("Remove this collaborator?")) return;
+    setRemovingId(userId);
     try {
       await removeCollaborator(selectedId, userId);
+      toastSuccess("Collaborator removed");
       setCollaborators((prev) => prev.filter((c) => c.userId !== userId));
     } catch (err: any) {
+      toastError(err.message || "Failed to remove collaborator");
       setError(err.message || "Failed to remove collaborator");
+    } finally {
+      setRemovingId(null);
     }
   };
 
@@ -240,40 +363,67 @@ export function CollectionsPage() {
               <p className="text-xs text-slate-500">Collections</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               to="/"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
             >
               Library
             </Link>
             <Link
+              to="/collections"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/collections"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
+            >
+              Collections
+            </Link>
+            <Link
               to="/discover"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/discover"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
             >
               Discover
             </Link>
             <Link
               to="/settings"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/settings"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
             >
               Settings
             </Link>
             <button
               onClick={() => setModalOpen(true)}
-              className="rounded-lg bg-indigo-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-600"
+              className="hidden rounded-lg bg-indigo-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-600 sm:block"
             >
               Add bookmark
             </button>
+            <DigestPopover />
             <button
               onClick={() => setBuilderOpen(true)}
-              className="rounded-lg bg-emerald-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+              className="hidden rounded-lg bg-emerald-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 sm:block"
             >
               New collection
             </button>
             <button
               onClick={logout}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200 sm:block"
               title="Log out"
             >
               <svg
@@ -291,6 +441,7 @@ export function CollectionsPage() {
                 />
               </svg>
             </button>
+            <MobileNav />
           </div>
         </div>
       </header>
@@ -337,10 +488,11 @@ export function CollectionsPage() {
                         {!c.isDefault && active && (
                           <div className="mt-1 flex justify-end">
                             <button
-                              onClick={() => handleDelete(c.id)}
-                              className="text-xs text-red-400 hover:text-red-300"
+                              onClick={() => handleDeleteCollection(c.id)}
+                              disabled={deletingId === c.id}
+                              className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              Delete
+                              {deletingId === c.id ? "Deleting…" : "Delete"}
                             </button>
                           </div>
                         )}
@@ -408,7 +560,8 @@ export function CollectionsPage() {
                               </button>
                               <button
                                 onClick={handleUnshare}
-                                className="rounded-lg bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20"
+                                disabled={sharing}
+                                className="rounded-lg bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 Revoke link
                               </button>
@@ -416,8 +569,12 @@ export function CollectionsPage() {
                           ) : (
                             <button
                               onClick={handleShare}
-                              className="rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-600"
+                              disabled={sharing}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
+                              {sharing && (
+                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                              )}
                               Generate share link
                             </button>
                           )}
@@ -448,8 +605,12 @@ export function CollectionsPage() {
                         />
                         <button
                           type="submit"
-                          className="rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-600"
+                          disabled={inviting}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
+                          {inviting && (
+                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                          )}
                           Invite
                         </button>
                       </form>
@@ -468,9 +629,10 @@ export function CollectionsPage() {
                               </div>
                               <button
                                 onClick={() => handleRemoveCollaborator(c.userId)}
-                                className="text-xs text-red-400 hover:text-red-300"
+                                disabled={removingId === c.userId}
+                                className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                Remove
+                                {removingId === c.userId ? "Removing…" : "Remove"}
                               </button>
                             </li>
                           ))}
@@ -493,6 +655,8 @@ export function CollectionsPage() {
                           bookmark={bm}
                           onTagClick={() => navigate("/")}
                           selectedTags={[]}
+                          onEdit={handleEditBookmark}
+                          onDelete={handleDeleteBookmark}
                         />
                       ))}
                     </div>
@@ -512,16 +676,14 @@ export function CollectionsPage() {
 
       <BookmarkModal
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSubmit={async (payload: BookmarkCreate) => {
-          await createBookmark(payload);
+        onClose={() => {
           setModalOpen(false);
-          if (selectedId) {
-            const data = await fetchCollectionBookmarks(selectedId);
-            setBookmarks(data);
-          }
-          await loadCollections();
+          setEditingBookmark(null);
         }}
+        onSubmit={handleModalSubmit}
+        onApplyTags={editingBookmark ? handleApplyTags : undefined}
+        onDelete={editingBookmark ? handleModalDelete : undefined}
+        initialData={editingBookmark}
       />
 
       {/* Rule Builder Modal */}
@@ -673,9 +835,13 @@ export function CollectionsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-600"
+                  disabled={builderSubmitting}
+                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-600 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Save collection
+                  {builderSubmitting && (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  )}
+                  {builderSubmitting ? "Saving…" : "Save collection"}
                 </button>
               </div>
             </form>

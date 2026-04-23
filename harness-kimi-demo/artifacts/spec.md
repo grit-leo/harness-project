@@ -223,3 +223,48 @@ The long-term vision is a "read-later + bookmark + knowledge-graph" hybrid. User
 - All API traffic over HTTPS.
 - Row-level security ensures users access only their own data (or explicitly shared collections).
 - AI prompts must not include sensitive user metadata beyond the public page content.
+
+---
+
+### Sprint 6: Smart URL Capture & Thumbnail Previews
+
+**Goal**: Eliminate manual data entry when adding bookmarks and make the grid visually compelling with thumbnail previews.
+
+**Frontend**
+- [ ] `AddBookmarkModal` auto-fetches page metadata (title, description, thumbnail) when a URL is pasted or typed.
+- [ ] Display a loading skeleton while fetching.
+- [ ] Show a preview card (thumbnail + fetched title) before submission; allow user to edit.
+- [ ] `BookmarkCard` displays `thumbnail_url` as a top image (16:9 aspect ratio, object-cover) with a fallback gradient placeholder if no thumbnail.
+- [ ] Update `BookmarkGrid` and `BookmarkList` layouts to accommodate thumbnails without breaking existing filters/search.
+
+**Backend**
+- [ ] New endpoint `POST /api/bookmarks/fetch-metadata` that accepts a URL, fetches the HTML, extracts `<title>`, `<meta name="description">`, and `<meta property="og:image">` via robust parsing (respecting timeouts and robots.txt).
+- [ ] Store `thumbnail_url` on the `Bookmark` model (nullable string).
+- [ ] Return extracted metadata to the frontend; do NOT auto-create the bookmark—let the user confirm.
+- [ ] Add rate limiting and URL validation (scheme must be http/https).
+
+**UX Notes**
+- Fetch should trigger on URL blur or after 800ms debounce, not on every keystroke.
+- If fetch fails, silently fall back to letting the user type the title manually (no blocking error).
+
+---
+
+### Sprint 7: AI Tag Suggestions in Add Modal
+
+**Goal**: Bring the existing AI tag-suggestion feature into the creation flow so users get intelligent tags immediately.
+
+**Frontend**
+- [ ] Integrate the existing `SuggestTagsButton` component (or its logic) directly into `AddBookmarkModal`.
+- [ ] After metadata is fetched and the user confirms the title, show a "Suggest tags with AI" button next to the tag input.
+- [ ] Display AI-suggested tags as clickable chips (distinct visual style from user-added tags).
+- [ ] Allow one-click "Apply all suggested tags"; also allow individual dismissal.
+- [ ] Ensure the suggestion flow works even when URL metadata fetch fails (falls back to title-only suggestion).
+
+**Backend**
+- [ ] Reuse existing `POST /api/bookmarks/:id/suggest-tags` logic, but add a new lightweight endpoint `POST /api/bookmarks/suggest-tags` that accepts `{ title, url?, summary? }` and returns suggested tags without requiring a persisted bookmark ID.
+- [ ] Cache suggestions keyed by URL to avoid redundant LLM calls.
+- [ ] Return 3-5 concise tags; enforce the same tag-normalization rules (lowercase, alphanumeric + hyphen).
+
+**UX Notes**
+- Suggestions should feel instant (< 1s) for cached URLs; show a subtle loading spinner otherwise.
+- If the user edits the title after suggestions appear, allow re-triggering the suggestion request.

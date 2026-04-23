@@ -14,6 +14,7 @@ class Bookmark(Base):
     url = Column(Text, nullable=False)
     title = Column(String(255), nullable=False)
     summary = Column(Text, nullable=True)
+    thumbnail_url = Column(String(2048), nullable=True)
     suggested_tags = Column(JSON, nullable=True, default=list)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

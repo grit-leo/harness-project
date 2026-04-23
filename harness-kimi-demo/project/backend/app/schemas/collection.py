@@ -40,9 +40,9 @@ class CollectionOut(BaseModel):
 
 
 class CollaboratorOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    userId: str = Field(alias="user_id")
+    userId: str = Field(alias="user_id", serialization_alias="userId")
     email: str
     role: str
 

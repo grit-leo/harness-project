@@ -111,11 +111,17 @@ run_kimi() {
 
 # Agents that need Playwright MCP (Evaluator, Reviewer).
 # Kills leftover browsers before EACH attempt to prevent CDP / lock conflicts.
+# Uses config/playwright-mcp-isolated.json so Playwright runs with --isolated
+# (avoids "Browser is already in use for ... mcp-chrome-*" when another MCP
+# or a stale Chromium still holds the shared profile).
 run_kimi_with_browser() {
   local label="$1"
   local prompt="$2"
   local expected_file="${3:-}"
   local t_start t_end elapsed attempt=0 exit_code ok
+  local _saved_browser_args="$KIMI_EXTRA_ARGS"
+
+  KIMI_EXTRA_ARGS="$_saved_browser_args --mcp-config-file ${ROOT}/config/playwright-mcp-isolated.json"
 
   t_start="$(date +%s)"
 
@@ -155,6 +161,8 @@ run_kimi_with_browser() {
   t_end="$(date +%s)"
   elapsed=$(( t_end - t_start ))
   echo "  [kimi] ${label} — done in $(( elapsed / 60 ))m $(( elapsed % 60 ))s"
+
+  KIMI_EXTRA_ARGS="$_saved_browser_args"
 }
 
 # Agents that do NOT need the browser (Planner, Generator, Contract, Polish, Evolution).

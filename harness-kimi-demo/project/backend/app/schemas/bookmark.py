@@ -5,17 +5,23 @@ from app.schemas.common import UtcDatetime
 
 
 class BookmarkCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     url: HttpUrl
     title: str = Field(..., min_length=1)
     summary: str = ""
     tags: List[str] = []
+    thumbnail_url: str | None = Field(default=None, alias="thumbnailUrl")
 
 
 class BookmarkUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     url: HttpUrl | None = None
     title: str | None = Field(None, min_length=1)
     summary: str | None = None
     tags: List[str] | None = None
+    thumbnail_url: str | None = Field(default=None, alias="thumbnailUrl")
 
 
 class BookmarkOut(BaseModel):
@@ -26,6 +32,7 @@ class BookmarkOut(BaseModel):
     url: str
     tags: List[str]
     summary: str
+    thumbnailUrl: str | None = Field(default=None, alias="thumbnail_url", serialization_alias="thumbnailUrl")
     suggestedTags: List[str] = Field(default=[], alias="suggested_tags", serialization_alias="suggestedTags")
     createdAt: UtcDatetime = Field(alias="created_at", serialization_alias="createdAt")
     updatedAt: UtcDatetime = Field(alias="updated_at", serialization_alias="updatedAt")
@@ -52,6 +59,12 @@ class BookmarkOut(BaseModel):
 
 class SuggestedTagsOut(BaseModel):
     suggested_tags: List[str]
+
+
+class SuggestTagsPayload(BaseModel):
+    title: str = Field(..., min_length=1)
+    url: str | None = None
+    summary: str | None = None
 
 
 class ApplyTagsPayload(BaseModel):

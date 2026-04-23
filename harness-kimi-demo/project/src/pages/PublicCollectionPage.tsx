@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import {
   fetchPublicCollection,
   fetchPublicCollectionBookmarks,
@@ -9,14 +9,19 @@ import {
   type Bookmark,
 } from "../api/client";
 import { BookmarkCard } from "../components/BookmarkCard";
+import { MobileNav } from "../components/MobileNav";
+import { useToast } from "../components/Toast";
 
 export function PublicCollectionPage() {
   const { token } = useParams<{ token: string }>();
+  const location = useLocation();
   const [collection, setCollection] = useState<PublicCollection | null>(null);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [followed, setFollowed] = useState(false);
+  const [following, setFollowing] = useState(false);
+  const { success: toastSuccess, error: toastError } = useToast();
   const isLoggedIn = !!getAccessToken();
 
   useEffect(() => {
@@ -40,11 +45,16 @@ export function PublicCollectionPage() {
 
   const handleFollow = async () => {
     if (!token) return;
+    setFollowing(true);
     try {
       await followPublicCollection(token);
+      toastSuccess("You are now following this collection");
       setFollowed(true);
     } catch (err: any) {
+      toastError(err.message || "Failed to follow");
       setError(err.message || "Failed to follow");
+    } finally {
+      setFollowing(false);
     }
   };
 
@@ -82,18 +92,50 @@ export function PublicCollectionPage() {
               <p className="text-xs text-slate-500">Public Collection</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               to="/"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
             >
               Library
             </Link>
             <Link
+              to="/collections"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/collections"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
+            >
+              Collections
+            </Link>
+            <Link
               to="/discover"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/discover"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
             >
               Discover
+            </Link>
+            <Link
+              to="/settings"
+              className={[
+                "hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:block",
+                location.pathname === "/settings"
+                  ? "bg-indigo-500/10 text-indigo-300"
+                  : "text-slate-400 hover:text-slate-200",
+              ].join(" ")}
+            >
+              Settings
             </Link>
             {!isLoggedIn && (
               <Link
@@ -103,6 +145,7 @@ export function PublicCollectionPage() {
                 Sign in
               </Link>
             )}
+            <MobileNav />
           </div>
         </div>
       </header>
@@ -144,15 +187,18 @@ export function PublicCollectionPage() {
               {isLoggedIn ? (
                 <button
                   onClick={handleFollow}
-                  disabled={followed}
+                  disabled={followed || following}
                   className={[
-                    "rounded-lg px-5 py-2.5 text-sm font-medium transition-colors",
+                    "inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium transition-colors",
                     followed
                       ? "bg-emerald-500/10 text-emerald-400 cursor-default"
                       : "bg-indigo-500 text-white hover:bg-indigo-600",
                   ].join(" ")}
                 >
-                  {followed ? "Following" : "Follow this collection"}
+                  {following && (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  )}
+                  {followed ? "Following" : following ? "Following…" : "Follow this collection"}
                 </button>
               ) : (
                 <Link

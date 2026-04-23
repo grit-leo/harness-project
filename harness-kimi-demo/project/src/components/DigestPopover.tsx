@@ -1,31 +1,45 @@
 import { useState, useEffect, useRef } from "react";
-import { fetchDigest, markDigestSeen, type DigestItem } from "../api/client";
+import { fetchDigest, markDigestSeen, getAccessToken, type DigestItem } from "../api/client";
+
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+let cachedItems: DigestItem[] | null = null;
+let cachedAt = 0;
 
 export function DigestPopover() {
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<DigestItem[]>([]);
+  const [items, setItems] = useState<DigestItem[]>(cachedItems || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
+  const loadingRef = useRef(false);
 
-  const load = async () => {
+  const load = async (force = false) => {
+    if (!getAccessToken()) return;
+    if (loadingRef.current) return;
+    const now = Date.now();
+    if (!force && cachedItems && now - cachedAt < CACHE_TTL_MS) {
+      setItems(cachedItems);
+      return;
+    }
+    loadingRef.current = true;
     setLoading(true);
     setError("");
     try {
       const data = await fetchDigest();
+      cachedItems = data;
+      cachedAt = now;
       setItems(data);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   };
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 10000);
-    return () => clearInterval(interval);
-  }, []);
+  }, [])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -64,7 +78,7 @@ export function DigestPopover() {
       <button
         onClick={() => {
           setOpen((v) => !v);
-          if (!open) load();
+          if (!open) load(true);
         }}
         className="relative rounded-lg p-2 text-slate-400 transition-colors hover:text-slate-200"
         aria-label="Digest"

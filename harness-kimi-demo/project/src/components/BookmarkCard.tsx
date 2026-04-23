@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Bookmark } from "../api/client";
 
 interface BookmarkCardProps {
@@ -51,125 +52,150 @@ export function BookmarkCard({
   onEdit,
   onDelete,
 }: BookmarkCardProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const hostname = getHostname(bookmark.url);
   const relativeDate = getRelativeTime(bookmark.createdAt);
   const faviconUrl = getFaviconUrl(hostname);
+  const hasThumbnail = !!bookmark.thumbnailUrl && !imgError;
 
   return (
-    <article className="group flex flex-col rounded-2xl bg-slate-900 border border-slate-800/60 p-5 transition-all duration-200 hover:border-slate-700 hover:bg-slate-800/60 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-950/50">
-      <a
-        href={bookmark.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mb-4 flex items-start gap-4"
-      >
-        <img
-          src={faviconUrl}
-          alt=""
-          aria-label="Favicon"
-          className="h-12 w-12 shrink-0 rounded-xl bg-slate-800 object-contain ring-1 ring-inset ring-white/10 transition-colors"
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src =
-              "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='1.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244'/%3E%3C/svg%3E";
-          }}
-        />
-        <div className="flex-1 min-w-0">
-          <h3 className="line-clamp-2 text-base font-semibold leading-snug text-slate-200 transition-colors group-hover:text-white">
-            {bookmark.title}
-          </h3>
-          <p className="mt-1 truncate text-xs font-medium text-slate-500 font-mono">
-            {hostname}
-          </p>
+    <article className="group flex flex-col rounded-2xl bg-slate-900 border border-slate-800/60 overflow-hidden transition-all duration-200 hover:border-slate-700 hover:bg-slate-800/60 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-950/50">
+      {hasThumbnail ? (
+        <div className="aspect-video w-full overflow-hidden bg-slate-950">
+          <img
+            src={bookmark.thumbnailUrl}
+            alt=""
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={() => setImgError(true)}
+          />
         </div>
-      </a>
+      ) : (
+        <div className="aspect-video w-full bg-gradient-to-br from-slate-800 to-slate-900" />
+      )}
 
-      <p className="mb-4 line-clamp-2 text-sm leading-relaxed text-slate-400">
-        {bookmark.summary}
-      </p>
+      <div className="flex flex-col p-5">
+        <a
+          href={bookmark.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-4 flex items-start gap-4"
+        >
+          <img
+            src={faviconUrl}
+            alt=""
+            aria-label="Favicon"
+            className="h-12 w-12 shrink-0 rounded-xl bg-slate-800 object-contain ring-1 ring-inset ring-white/10 transition-colors"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src =
+                "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='1.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244'/%3E%3C/svg%3E";
+            }}
+          />
+          <div className="flex-1 min-w-0">
+            <h3 className="line-clamp-2 text-base font-semibold leading-snug text-slate-200 transition-colors group-hover:text-white">
+              {bookmark.title}
+            </h3>
+            <p className="mt-1 truncate text-xs font-medium text-slate-500 font-mono">
+              {hostname}
+            </p>
+          </div>
+        </a>
 
-      <div className="mt-auto flex flex-wrap items-center gap-2">
-        {bookmark.tags.map((tag) => {
-          const isActive = selectedTags.includes(tag);
-          return (
-            <button
-              key={tag}
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                onTagClick(tag);
-              }}
-              className={[
-                "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-all duration-200",
-                "border backdrop-blur-sm",
-                isActive
-                  ? "border-indigo-500/60 bg-indigo-500/20 text-indigo-300 shadow-sm shadow-indigo-500/20"
-                  : "border-slate-700 bg-slate-800/60 text-slate-300 hover:border-slate-600 hover:bg-slate-700/60 hover:-translate-y-0.5",
-              ].join(" ")}
-            >
-              {tag}
-            </button>
-          );
-        })}
-      </div>
+        {bookmark.summary && (
+          <p className="mb-4 line-clamp-2 text-sm leading-relaxed text-slate-400">
+            {bookmark.summary}
+          </p>
+        )}
 
-      <div className="mt-4 flex items-center justify-between border-t border-slate-800/60 pt-3">
-        <span className="text-xs font-mono text-slate-500">{relativeDate}</span>
-        <div className="flex items-center gap-2">
-          {onEdit && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onEdit(bookmark);
-              }}
-              className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300"
-              aria-label="Edit"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="h-4 w-4"
+        <div className="mt-auto flex flex-wrap items-center gap-2">
+          {bookmark.tags.map((tag) => {
+            const isActive = selectedTags.includes(tag);
+            return (
+              <button
+                key={tag}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onTagClick(tag);
+                }}
+                className={[
+                  "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-all duration-200",
+                  "border backdrop-blur-sm",
+                  isActive
+                    ? "border-indigo-500/60 bg-indigo-500/20 text-indigo-300 shadow-sm shadow-indigo-500/20"
+                    : "border-slate-700 bg-slate-800/60 text-slate-300 hover:border-slate-600 hover:bg-slate-700/60 hover:-translate-y-0.5",
+                ].join(" ")}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
-                />
-              </svg>
-            </button>
-          )}
-          {onDelete && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onDelete(bookmark);
-              }}
-              className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
-              aria-label="Delete"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="h-4 w-4"
+                {tag}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between border-t border-slate-800/60 pt-3">
+          <span className="text-xs font-mono text-slate-500">{relativeDate}</span>
+          <div className="flex items-center gap-2">
+            {onEdit && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onEdit(bookmark);
+                }}
+                className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300"
+                aria-label="Edit"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.245H6.424a2.25 2.25 0 01-2.244-2.245L3.25 5.79m13.968.003c-.342.052-.682.107-1.022.166m-1.022-.165L3.25 5.79M10.5 7.5v10.5M13.5 7.5v10.5"
-                />
-              </svg>
-            </button>
-          )}
-          <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400/80" aria-hidden="true" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="h-4 w-4"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+                  />
+                </svg>
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDeleting(true);
+                  try {
+                    await onDelete(bookmark);
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+                className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Delete"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="h-4 w-4"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.245H6.424a2.25 2.25 0 01-2.244-2.245L3.25 5.79m13.968.003c-.342.052-.682.107-1.022.166m-1.022-.165L3.25 5.79M10.5 7.5v10.5M13.5 7.5v10.5"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </article>
