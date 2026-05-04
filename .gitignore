@@ -26,3 +26,11 @@
 
 # Playwright MCP local cache (snapshots)
 **/.playwright-mcp/
+
+# Kimi harness: regenerated each run (keep only .gitkeep in repo)
+harness-kimi-demo/artifacts/*
+!harness-kimi-demo/artifacts/.gitkeep
+!harness-kimi-demo/artifacts/screenshots/
+harness-kimi-demo/artifacts/screenshots/*
+!harness-kimi-demo/artifacts/screenshots/.gitkeep
+harness-kimi-demo/review-screenshots/

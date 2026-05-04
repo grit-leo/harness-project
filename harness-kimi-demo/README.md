@@ -77,6 +77,10 @@ export HARNESS_WORKSPACE=/path/to/某目录/.harness
 ./run-harness-full.sh --resume
 ```
 
+## 运行产物
+
+本仓库中的 `artifacts/`（`spec.md`、合同与 QA 报告、截图、`harness-state.json` 等）由每次运行生成，已在仓库根目录 `.gitignore` 中忽略，**不会提交到 Git**；目录内仅保留 `.gitkeep` 占位。外仓模式下的 `.harness/artifacts/` 请自行在业务仓库中忽略。
+
 ## 依赖
 
 - `kimi` CLI 在 `PATH` 中
