@@ -67,52 +67,114 @@ wait_for_url() {
 }
 
 restart_backend() {
-  local backend_dir="${ROOT}/project/backend"
   local log_file="/tmp/harness-logs/backend.log"
+  mkdir -p /tmp/harness-logs
 
-  if [[ ! -f "${backend_dir}/main.py" ]]; then
+  # Detect backend type and directory
+  local backend_dir=""
+  local backend_type=""
+
+  if [[ -f "${ROOT}/project/backend/main.py" || -f "${ROOT}/project/main.py" ]]; then
+    backend_type="python"
+    backend_dir="${ROOT}/project/backend"
+    [[ ! -d "$backend_dir" ]] && backend_dir="${ROOT}/project"
+  elif find "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
+    backend_type="java-maven"
+    backend_dir="$(dirname "$(find "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit)")"
+  elif find "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
+    backend_type="java-gradle"
+    backend_dir="$(dirname "$(find "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit)")"
+  fi
+
+  if [[ -z "$backend_type" ]]; then
+    echo "  [restart] No recognizable backend found. Skipping."
     return 0
   fi
 
-  echo "  [restart] Stopping old backend..."
-  pkill -f "uvicorn.*main:app" 2>/dev/null || true
-  sleep 2
+  echo "  [restart] Detected backend: $backend_type at $(realpath --relative-to="${ROOT}" "$backend_dir" 2>/dev/null || echo "$backend_dir")"
 
-  mkdir -p /tmp/harness-logs
-  echo "  [restart] Starting backend (uvicorn)..."
-  (
-    cd "$backend_dir"
-    if [[ -d .venv ]]; then
-      source .venv/bin/activate
-    fi
-    nohup python3 -m uvicorn main:app --host 127.0.0.1 --port 8000 \
-      > "$log_file" 2>&1 &
-  )
-
-  wait_for_url "http://127.0.0.1:8000/docs" "Backend :8000" 5 || true
+  case "$backend_type" in
+    python)
+      echo "  [restart] Stopping old Python backend..."
+      pkill -f "uvicorn.*main:app" 2>/dev/null || true
+      sleep 2
+      echo "  [restart] Starting Python backend (uvicorn)..."
+      (
+        cd "$backend_dir"
+        if [[ -d .venv ]]; then
+          source .venv/bin/activate
+        fi
+        nohup python3 -m uvicorn main:app --host 127.0.0.1 --port 8000 \
+          > "$log_file" 2>&1 &
+      )
+      wait_for_url "http://127.0.0.1:8000/docs" "Backend :8000" 5 || true
+      ;;
+    java-maven)
+      echo "  [restart] Stopping old Java backend..."
+      pkill -f "spring-boot:run" 2>/dev/null || true
+      jps -l 2>/dev/null | grep -iE 'spring|boot' | awk '{print $1}' | xargs kill 2>/dev/null || true
+      sleep 2
+      echo "  [restart] Starting Java backend (Maven Spring Boot)..."
+      (
+        cd "$backend_dir"
+        nohup mvn spring-boot:run -Dspring-boot.run.arguments="--server.port=8080" \
+          > "$log_file" 2>&1 &
+      )
+      wait_for_url "http://127.0.0.1:8080/actuator/health" "Backend :8080" 12 || \
+      wait_for_url "http://127.0.0.1:8080/health" "Backend :8080" 5 || true
+      ;;
+    java-gradle)
+      echo "  [restart] Stopping old Java backend..."
+      pkill -f "gradle.*bootRun" 2>/dev/null || true
+      jps -l 2>/dev/null | grep -iE 'spring|boot|gradle' | awk '{print $1}' | xargs kill 2>/dev/null || true
+      sleep 2
+      echo "  [restart] Starting Java backend (Gradle Spring Boot)..."
+      (
+        cd "$backend_dir"
+        nohup ./gradlew bootRun --args="--server.port=8080" \
+          > "$log_file" 2>&1 &
+      )
+      wait_for_url "http://127.0.0.1:8080/actuator/health" "Backend :8080" 12 || \
+      wait_for_url "http://127.0.0.1:8080/health" "Backend :8080" 5 || true
+      ;;
+  esac
 }
 
 restart_frontend() {
-  local project_dir="${ROOT}/project"
   local log_file="/tmp/harness-logs/frontend.log"
+  mkdir -p /tmp/harness-logs
 
-  if [[ ! -f "${project_dir}/package.json" ]]; then
+  # Find package.json recursively (up to 2 levels deep)
+  local pkg_json
+  pkg_json="$(find "${ROOT}/project" -maxdepth 2 -name "package.json" -print -quit 2>/dev/null)"
+
+  if [[ -z "$pkg_json" ]]; then
+    echo "  [restart] No frontend (package.json) found. Skipping."
     return 0
   fi
 
+  local project_dir
+  project_dir="$(dirname "$pkg_json")"
+
+  echo "  [restart] Detected frontend at $(realpath --relative-to="${ROOT}" "$project_dir" 2>/dev/null || echo "$project_dir")"
+
   echo "  [restart] Stopping old frontend..."
   pkill -f "node.*vite" 2>/dev/null || true
-  lsof -ti :5173 2>/dev/null | xargs kill -9 2>/dev/null || true
+  for port in 5173 3000 4200 8081; do
+    lsof -ti :$port 2>/dev/null | xargs kill -9 2>/dev/null || true
+  done
   sleep 2
 
-  mkdir -p /tmp/harness-logs
-  echo "  [restart] Starting frontend (vite)..."
+  echo "  [restart] Starting frontend dev server..."
   (
     cd "$project_dir"
     nohup npm run dev > "$log_file" 2>&1 &
   )
 
-  wait_for_url "http://localhost:5173/" "Frontend :5173" 8 || true
+  # Try common frontend ports
+  wait_for_url "http://localhost:5173/" "Frontend :5173" 5 || \
+  wait_for_url "http://localhost:3000/" "Frontend :3000" 5 || \
+  wait_for_url "http://localhost:8081/" "Frontend :8081" 3 || true
 }
 
 # Ensure both backend and frontend are running with fresh code.

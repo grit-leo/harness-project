@@ -5,13 +5,38 @@
 #   ./continue-harness.sh              # 默认从 Sprint 5 再跑一轮（修最后一段）
 #   ./continue-harness.sh 2            # 只重跑 Sprint 2
 #   ./continue-harness.sh 2 5          # 重跑 Sprint 2～5（耗时长）
+#   ./continue-harness.sh --project /path/to/git/repo [from] [to]
 #
 # 环境变量:
+#   HARNESS_PROJECT_ROOT=/path ./continue-harness.sh
 #   MAX_QA_ROUNDS=5 ./continue-harness.sh 2
 #
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")" && pwd)"
-cd "$ROOT"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if [[ "${1:-}" == "--project" ]]; then
+  shift
+  LEGACY_PROJECT="${1:?ERROR: --project requires a directory}"
+  shift
+fi
+
+if [[ -n "${HARNESS_PROJECT_ROOT:-}" && -z "${LEGACY_PROJECT:-}" ]]; then
+  LEGACY_PROJECT="$HARNESS_PROJECT_ROOT"
+fi
+
+if [[ -n "${LEGACY_PROJECT:-}" ]]; then
+  LEGACY_PROJECT="$(cd "$LEGACY_PROJECT" && pwd)"
+  WORK_ROOT="$LEGACY_PROJECT/.harness"
+else
+  WORK_ROOT="$SCRIPT_DIR"
+fi
+
+source "${SCRIPT_DIR}/lib/workspace.sh"
+ensure_harness_workspace || exit 1
+
+cd "$WORK_ROOT"
+ROOT="$WORK_ROOT"
+export ROOT WORK_ROOT SCRIPT_DIR LEGACY_PROJECT
 
 FROM="${1:-5}"
 TO="${2:-$FROM}"
@@ -24,7 +49,7 @@ print(max(int(x) for x in m) if m else 0)
 ")"
 
 if (( FROM < 1 || TO < FROM || TO > TOTAL )); then
-  echo "Usage: $0 [from_sprint] [to_sprint]  (spec has ${TOTAL} sprints)" >&2
+  echo "Usage: $0 [--project DIR] [from_sprint] [to_sprint]  (spec has ${TOTAL} sprints)" >&2
   exit 1
 fi
 
@@ -55,4 +80,8 @@ PY
 export CONTINUE_SPRINT="$FROM"
 echo ""
 echo "Starting harness from sprint $FROM → $TOTAL (QA rounds: ${MAX_QA_ROUNDS:-3})..."
-exec ./run-harness-full.sh --resume
+if [[ -n "${LEGACY_PROJECT:-}" ]]; then
+  exec "${SCRIPT_DIR}/run-harness-full.sh" --project "$LEGACY_PROJECT" --resume
+else
+  exec "${SCRIPT_DIR}/run-harness-full.sh" --resume
+fi

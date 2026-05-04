@@ -12,25 +12,98 @@
 #  threshold is met, then picks up new goals from the queue.
 #
 #  Usage:
-#    ./run-harness-full.sh "Build a ..."            # fresh run
+#    ./run-harness-full.sh "Build a ..."            # fresh run (in-tree demo)
+#    ./run-harness-full.sh --project /path/to/git/repo "迭代功能描述…"
+#    HARNESS_PROJECT_ROOT=/path/to/repo ./run-harness-full.sh "…"
+#    HARNESS_WORKSPACE=/path/to/.harness ./run-harness-full.sh --resume   # explicit workspace dir
 #    ./run-harness-full.sh --resume                  # resume from state
-#    ./run-harness-full.sh --add-goal "Add feature"  # queue a new goal
+#    ./run-harness-full.sh --add-goal "Add feature"  # queue a new goal (same --project as prior run)
 #    QUALITY_THRESHOLD=7 ./run-harness-full.sh "..." # custom threshold
 #    STRICT_MODE=true ./run-harness-full.sh "..."    # halt on Sprint FAIL
 #    MAX_POLISH_ROUNDS=3 ./run-harness-full.sh "..." # max polish iterations
 # ═══════════════════════════════════════════════════════════════════
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
-cd "$ROOT"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# ── Load libraries ───────────────────────────────────────────────
-source "${ROOT}/lib/state.sh"
-source "${ROOT}/lib/parse-sprints.sh"
-source "${ROOT}/lib/check-verdict.sh"
-source "${ROOT}/lib/render-prompt.sh"
-source "${ROOT}/lib/restart-servers.sh"
-source "${ROOT}/lib/quality-gate.sh"
+# ── Resolve WORK_ROOT (Kimi -w + cwd): demo tree or repo/.harness ──
+RESUME=false
+USER_GOAL=""
+ADD_GOAL=""
+HARNESS_PROJECT_ARG=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --resume)
+      RESUME=true
+      shift
+      ;;
+    --add-goal)
+      shift
+      ADD_GOAL="${1:-}"
+      shift 2>/dev/null || true
+      ;;
+    --project)
+      shift
+      HARNESS_PROJECT_ARG="${1:-}"
+      if [[ -z "$HARNESS_PROJECT_ARG" ]]; then
+        echo "ERROR: --project requires a directory path." >&2
+        exit 1
+      fi
+      shift
+      ;;
+    *)
+      USER_GOAL="$1"
+      shift
+      ;;
+  esac
+done
+
+LEGACY_PROJECT="${HARNESS_PROJECT_ARG:-${HARNESS_PROJECT_ROOT:-}}"
+
+if [[ -n "${HARNESS_WORKSPACE:-}" ]]; then
+  WORK_ROOT="$(cd "${HARNESS_WORKSPACE}" && pwd)"
+elif [[ -n "$LEGACY_PROJECT" ]]; then
+  LEGACY_PROJECT="$(cd "$LEGACY_PROJECT" && pwd)"
+  WORK_ROOT="$LEGACY_PROJECT/.harness"
+else
+  WORK_ROOT="$SCRIPT_DIR"
+  LEGACY_PROJECT=""
+fi
+
+source "${SCRIPT_DIR}/lib/workspace.sh"
+ensure_harness_workspace || exit 1
+
+cd "$WORK_ROOT"
+ROOT="$WORK_ROOT"
+export ROOT WORK_ROOT SCRIPT_DIR LEGACY_PROJECT
+
+# ── Log setup ────────────────────────────────────────────────────
+LOG_DIR="/tmp/harness-logs"
+mkdir -p "$LOG_DIR"
+# Generator Fix uses this to disable MCP (see QA loop). Must exist or Kimi may behave inconsistently.
+printf '%s\n' '{"mcpServers":{}}' > /tmp/empty-mcp.json
+
+# ── Graceful interrupt ───────────────────────────────────────────
+cleanup() {
+  echo ""
+  echo "[$(date +%H:%M:%S)] Interrupted. State saved to artifacts/harness-state.json"
+  if [[ -n "${LEGACY_PROJECT:-}" ]]; then
+    echo "  Resume with: $0 --project $(printf '%q' "$LEGACY_PROJECT") --resume"
+  else
+    echo "  Resume with: $0 --resume"
+  fi
+  exit 130
+}
+trap cleanup SIGINT SIGTERM
+
+# ── Load libraries (templates/config live under SCRIPT_DIR) ───────
+source "${SCRIPT_DIR}/lib/state.sh"
+source "${SCRIPT_DIR}/lib/parse-sprints.sh"
+source "${SCRIPT_DIR}/lib/check-verdict.sh"
+source "${SCRIPT_DIR}/lib/render-prompt.sh"
+source "${SCRIPT_DIR}/lib/restart-servers.sh"
+source "${SCRIPT_DIR}/lib/quality-gate.sh"
 
 # ── Configuration (override via env) ─────────────────────────────
 USER_MAX_QA="${MAX_QA_ROUNDS:-}"
@@ -42,21 +115,6 @@ QUALITY_THRESHOLD="${QUALITY_THRESHOLD:-7.0}"
 MAX_POLISH_ROUNDS="${MAX_POLISH_ROUNDS:-3}"
 MAX_EPOCHS="${MAX_EPOCHS:-10}"
 HARNESS_START_TIME="$(date +%s)"
-
-# ── Log setup ────────────────────────────────────────────────────
-LOG_DIR="/tmp/harness-logs"
-mkdir -p "$LOG_DIR" artifacts project prompts/templates
-# Generator Fix uses this to disable MCP (see QA loop). Must exist or Kimi may behave inconsistently.
-printf '%s\n' '{"mcpServers":{}}' > /tmp/empty-mcp.json
-
-# ── Graceful interrupt ───────────────────────────────────────────
-cleanup() {
-  echo ""
-  echo "[$(date +%H:%M:%S)] Interrupted. State saved to artifacts/harness-state.json"
-  echo "  Resume with: $0 --resume"
-  exit 130
-}
-trap cleanup SIGINT SIGTERM
 
 # ── Helper: run kimi with timing + auto-retry ─────────────────────
 # Usage: run_kimi "Label" "$prompt" [expected_artifact]
@@ -121,7 +179,7 @@ run_kimi_with_browser() {
   local t_start t_end elapsed attempt=0 exit_code ok
   local _saved_browser_args="$KIMI_EXTRA_ARGS"
 
-  KIMI_EXTRA_ARGS="$_saved_browser_args --mcp-config-file ${ROOT}/config/playwright-mcp-isolated.json"
+  KIMI_EXTRA_ARGS="$_saved_browser_args --mcp-config-file ${SCRIPT_DIR}/config/playwright-mcp-isolated.json"
 
   t_start="$(date +%s)"
 
@@ -173,31 +231,6 @@ run_kimi_no_browser() {
   run_kimi "$@"
   KIMI_EXTRA_ARGS="$_saved_args"
 }
-
-# ══════════════════════════════════════════════════════════════════
-#  ARGUMENT PARSING
-# ══════════════════════════════════════════════════════════════════
-RESUME=false
-USER_GOAL=""
-ADD_GOAL=""
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --resume)
-      RESUME=true
-      shift
-      ;;
-    --add-goal)
-      shift
-      ADD_GOAL="${1:-}"
-      shift 2>/dev/null || true
-      ;;
-    *)
-      USER_GOAL="$1"
-      shift
-      ;;
-  esac
-done
 
 # Handle --add-goal (queue a goal and exit)
 if [[ -n "$ADD_GOAL" ]]; then
@@ -254,6 +287,10 @@ if $RESUME && state_exists; then
   echo "  Max QA rounds:     $MAX_QA_ROUNDS"
   echo "  Quality threshold: $QUALITY_THRESHOLD"
   echo "  Strict mode:       $STRICT_MODE"
+  if [[ -n "${LEGACY_PROJECT:-}" ]]; then
+    echo "  Target repo:       $LEGACY_PROJECT"
+    echo "  Harness workspace: $WORK_ROOT"
+  fi
 else
   if [[ -z "$USER_GOAL" ]]; then
     USER_GOAL="Build a personal bookmark manager with tagging, full-text search, and a clean modern UI."
@@ -270,6 +307,10 @@ else
   echo "  Max polish rounds: $MAX_POLISH_ROUNDS"
   echo "  Strict mode:       $STRICT_MODE"
   echo "  State file:        artifacts/harness-state.json"
+  if [[ -n "${LEGACY_PROJECT:-}" ]]; then
+    echo "  Target repo:       $LEGACY_PROJECT"
+    echo "  Harness workspace: $WORK_ROOT"
+  fi
   echo "═══════════════════════════════════════════════════════════"
 fi
 
@@ -492,7 +533,11 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
 
     if [[ ! -f "$REVIEW_FILE" ]]; then
       echo "  WARNING: Product review not written after ${KIMI_MAX_RETRIES} attempts."
-      echo "  Resume later with: $0 --resume"
+      if [[ -n "${LEGACY_PROJECT:-}" ]]; then
+        echo "  Resume later with: $0 --project $(printf '%q' "$LEGACY_PROJECT") --resume"
+      else
+        echo "  Resume later with: $0 --resume"
+      fi
       state_set phase "review_failed"
     fi
   else
@@ -699,8 +744,13 @@ echo "  Artifacts:"
 ls -la artifacts/*.md 2>/dev/null
 echo ""
 echo "  To continue evolving:"
-echo "    $0 --add-goal \"Your new feature request\""
-echo "    $0 --resume"
+if [[ -n "${LEGACY_PROJECT:-}" ]]; then
+  echo "    $0 --project $(printf '%q' "$LEGACY_PROJECT") --add-goal \"Your new feature request\""
+  echo "    $0 --project $(printf '%q' "$LEGACY_PROJECT") --resume"
+else
+  echo "    $0 --add-goal \"Your new feature request\""
+  echo "    $0 --resume"
+fi
 echo ""
 echo "  To run the app:  cd project && npm install && npm run dev"
 echo "═══════════════════════════════════════════════════════════"

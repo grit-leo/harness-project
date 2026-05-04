@@ -29,8 +29,9 @@ The contract MUST include:
 [What must already exist from previous sprints]
 
 ## Tech Stack
-- Frontend: React 18 + Vite + TypeScript + Tailwind CSS
-- Backend: FastAPI (Python) + SQLite (if this sprint touches backend)
+- The tech stack MUST be taken from the "Technical Architecture" section of artifacts/spec.md.
+- Do NOT invent or switch technologies (e.g., do not replace Java/Spring Boot with Python/FastAPI, or Ant Design with Tailwind CSS, unless the spec explicitly says so).
+- Respect the ACTUAL directory structure in project/ (e.g., `memclaw-frontend/`, `memclaw-web/`). Do NOT create new directories like `frontend/` or `backend/` unless they already exist.
 - All previous sprint code is in project/
 
 Important: Write BOTH files now (create them on disk). Do NOT just print the content.

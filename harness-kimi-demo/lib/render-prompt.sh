@@ -116,20 +116,112 @@ else:
 "
 }
 
+# ── Detect existing project tech stack (for --project mode) ─────────
+detect_project_tech_stack() {
+  local project_dir="$1"
+  if [[ -z "$project_dir" || ! -d "$project_dir" ]]; then
+    echo ""
+    return
+  fi
+
+  local findings=()
+
+  # --- Frontend detection (search up to 2 levels deep) ---
+  local pkg_json
+  pkg_json="$(find "$project_dir" -maxdepth 2 -name "package.json" -print -quit 2>/dev/null)"
+  if [[ -n "$pkg_json" ]]; then
+    local fw="Unknown"
+    if grep -q '"react"' "$pkg_json" 2>/dev/null; then fw="React"; fi
+    if grep -q '"vue"' "$pkg_json" 2>/dev/null; then fw="Vue"; fi
+    if grep -q '"angular"' "$pkg_json" 2>/dev/null; then fw="Angular"; fi
+    if grep -q '"svelte"' "$pkg_json" 2>/dev/null; then fw="Svelte"; fi
+    if grep -q '"next"' "$pkg_json" 2>/dev/null; then fw="Next.js"; fi
+    findings+=("Frontend: $fw (package.json found)")
+
+    if grep -q '"tailwindcss"' "$pkg_json" 2>/dev/null || find "$project_dir" -maxdepth 2 -name "tailwind.config.*" -print -quit 2>/dev/null | grep -q .; then
+      findings+=("  - Tailwind CSS detected")
+    fi
+    if find "$project_dir" -maxdepth 2 -name "vite.config.*" -print -quit 2>/dev/null | grep -q .; then
+      findings+=("  - Vite detected")
+    fi
+  fi
+
+  # --- Backend detection ---
+  if find "$project_dir" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
+    findings+=("Backend: Java (Maven / Spring Boot)")
+  fi
+  if find "$project_dir" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
+    findings+=("Backend: Java/Kotlin (Gradle / Spring Boot)")
+  fi
+  if find "$project_dir" -maxdepth 2 -name "requirements.txt" -print -quit 2>/dev/null | grep -q .; then
+    findings+=("Backend: Python (requirements.txt)")
+  fi
+  if find "$project_dir" -maxdepth 2 -name "pyproject.toml" -print -quit 2>/dev/null | grep -q .; then
+    findings+=("Backend: Python (pyproject.toml)")
+  fi
+  if find "$project_dir" -maxdepth 2 -name "go.mod" -print -quit 2>/dev/null | grep -q .; then
+    findings+=("Backend: Go")
+  fi
+  if find "$project_dir" -maxdepth 2 -name "Cargo.toml" -print -quit 2>/dev/null | grep -q .; then
+    findings+=("Backend: Rust")
+  fi
+
+  # --- Database / DevOps ---
+  if find "$project_dir" -maxdepth 3 -name "*.sql" -print -quit 2>/dev/null | grep -q .; then
+    findings+=("Database: SQL schema files present")
+  fi
+  if find "$project_dir" -maxdepth 1 -name "Dockerfile*" -print -quit 2>/dev/null | grep -q .; then
+    findings+=("DevOps: Dockerfile present")
+  fi
+
+  if [[ ${#findings[@]} -eq 0 ]]; then
+    echo "No existing project detected. This is a GREENFIELD build."
+  else
+    echo "EXISTING PROJECT TECH STACK DETECTED:"
+    printf '  - %s\n' "${findings[@]}"
+    echo ""
+    echo "INSTRUCTION: The specification below MUST respect this existing tech stack. Do NOT propose replacing the backend language/framework or the frontend framework. Focus on REVIEWING, IMPROVING, and EXTENDING the EXISTING codebase."
+  fi
+}
+
+# ── Detect build command for evaluator ──────────────────────────────
+detect_build_command() {
+  if find "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
+    echo "cd project && mvn clean compile"
+  elif find "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
+    echo "cd project && ./gradlew build"
+  elif [[ -f "${ROOT}/project/package.json" ]]; then
+    echo "cd project && npm run build"
+  else
+    echo "cd project && npm run build"
+  fi
+}
+
 # ══════════════════════════════════════════════════════════════════════
 #  Prompt Renderers
 # ══════════════════════════════════════════════════════════════════════
 
 render_planner_prompt() {
   local user_goal="$1"
-  render_prompt "${ROOT}/prompts/templates/planner.txt" \
-    "__USER_GOAL__" "$user_goal"
+  local tech_stack_info=""
+
+  if [[ -n "${LEGACY_PROJECT:-}" && -d "${LEGACY_PROJECT}" ]]; then
+    tech_stack_info="$(detect_project_tech_stack "$LEGACY_PROJECT")"
+  fi
+
+  if [[ -z "$tech_stack_info" ]]; then
+    tech_stack_info="No existing project detected. This is a GREENFIELD build."
+  fi
+
+  render_prompt "${SCRIPT_DIR}/prompts/templates/planner.txt" \
+    "__USER_GOAL__" "$user_goal" \
+    "__EXISTING_TECH_STACK__" "$tech_stack_info"
 }
 
 render_contract_prompt() {
   local sprint_num="$1"
   local sprint_section="$2"
-  render_prompt "${ROOT}/prompts/templates/contract.txt" \
+  render_prompt "${SCRIPT_DIR}/prompts/templates/contract.txt" \
     "__SPRINT_NUM__" "$sprint_num" \
     "__SPRINT_SECTION__" "$sprint_section"
 }
@@ -148,7 +240,7 @@ render_generator_prompt() {
   local visual_ctx
   visual_ctx="$(collect_visual_context)"
 
-  render_prompt "${ROOT}/prompts/templates/generator.txt" \
+  render_prompt "${SCRIPT_DIR}/prompts/templates/generator.txt" \
     "__SPRINT_NUM__" "$sprint_num" \
     "__QA_FEEDBACK_LINE__" "$qa_feedback_line" \
     "__UNRESOLVED_BUGS__" "$unresolved_bugs" \
@@ -175,7 +267,7 @@ render_generator_fix_prompt() {
     fi
   fi
 
-  render_prompt "${ROOT}/prompts/templates/generator-fix.txt" \
+  render_prompt "${SCRIPT_DIR}/prompts/templates/generator-fix.txt" \
     "__SPRINT_NUM__" "$sprint_num" \
     "__QA_ROUND__" "$qa_round" \
     "__ALL_QA_REPORTS_LINE__" "$all_reports_line" \
@@ -203,12 +295,16 @@ render_evaluator_prompt() {
   local regression_criteria
   regression_criteria="$(collect_regression_criteria "$sprint_num")"
 
-  render_prompt "${ROOT}/prompts/templates/evaluator.txt" \
+  local build_cmd
+  build_cmd="$(detect_build_command)"
+
+  render_prompt "${SCRIPT_DIR}/prompts/templates/evaluator.txt" \
     "__SPRINT_NUM__" "$sprint_num" \
     "__QA_ROUND__" "$qa_round" \
     "__PREV_QA_LINE__" "$prev_qa_line" \
     "__PREV_BUG_STATUS_SECTION__" "$prev_bug_section" \
-    "__REGRESSION_CRITERIA__" "$regression_criteria"
+    "__REGRESSION_CRITERIA__" "$regression_criteria" \
+    "__BUILD_CMD__" "$build_cmd"
 }
 
 # ── Reviewer prompt ─────────────────────────────────────────────────
@@ -216,9 +312,9 @@ render_reviewer_prompt() {
   local epoch="$1"
 
   local core_journeys
-  core_journeys="$(source "${ROOT}/lib/quality-gate.sh" && generate_core_journeys)"
+  core_journeys="$(source "${SCRIPT_DIR}/lib/quality-gate.sh" && generate_core_journeys)"
 
-  render_prompt "${ROOT}/prompts/templates/reviewer.txt" \
+  render_prompt "${SCRIPT_DIR}/prompts/templates/reviewer.txt" \
     "__EPOCH__" "$epoch" \
     "__CORE_JOURNEYS__" "$core_journeys"
 }
@@ -229,7 +325,7 @@ render_polish_contract_prompt() {
   local epoch="$2"
   local num_items="${3:-5}"
 
-  render_prompt "${ROOT}/prompts/templates/polish-contract.txt" \
+  render_prompt "${SCRIPT_DIR}/prompts/templates/polish-contract.txt" \
     "__POLISH_NUM__" "$polish_num" \
     "__EPOCH__" "$epoch" \
     "__NUM_ITEMS__" "$num_items"
@@ -243,7 +339,7 @@ render_polish_generator_prompt() {
   local visual_ctx
   visual_ctx="$(collect_visual_context)"
 
-  render_prompt "${ROOT}/prompts/templates/polish-generator.txt" \
+  render_prompt "${SCRIPT_DIR}/prompts/templates/polish-generator.txt" \
     "__POLISH_NUM__" "$polish_num" \
     "__EPOCH__" "$epoch" \
     "__VISUAL_CONTEXT__" "$visual_ctx"

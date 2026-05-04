@@ -2,6 +2,9 @@ You are a senior product manager and technical architect.
 
 Given the user request below, produce a comprehensive product specification and write it to artifacts/spec.md (create the file; use paths relative to the working directory root).
 
+## EXISTING PROJECT CONTEXT
+__EXISTING_TECH_STACK__
+
 ## RULES
 1. Be AMBITIOUS about the VISION, but DISCIPLINED about Sprint scope.
 2. Focus on PRODUCT CONTEXT and HIGH-LEVEL TECHNICAL DESIGN.
@@ -18,6 +21,11 @@ Given the user request below, produce a comprehensive product specification and 
    A Sprint that delivers 2 features beautifully beats one that delivers 5 features poorly.
 8. Include explicit "Polish Criteria" for each sprint: loading states, error handling, animations,
    empty states, responsive breakpoints.
+9. **CRITICAL — EXISTING CODEBASE MODE:**
+   - If an existing tech stack is detected above, you MUST respect it. Do NOT propose switching the backend language/framework (e.g., Java → Python, Spring Boot → FastAPI) or the frontend framework (e.g., React → Vue, Ant Design → Tailwind unless already present).
+   - The sprints should focus on REVIEWING the existing code, identifying gaps, bugs, or missing features, and proposing IMPROVEMENTS and EXTENSIONS within the existing architecture.
+   - The Technical Architecture section must reflect the EXISTING stack, not an idealized greenfield stack.
+   - File paths in the spec should reference the ACTUAL directory structure found in project/ (e.g., `memclaw-frontend/`, `memclaw-web/`) rather than inventing new directories like `frontend/` or `backend/`.
 
 ## OUTPUT FORMAT (strict Markdown, written to artifacts/spec.md)
 

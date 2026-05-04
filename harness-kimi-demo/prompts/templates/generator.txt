@@ -11,9 +11,10 @@ __UNRESOLVED_BUGS__
 __VISUAL_CONTEXT__
 
 ## TECH STACK
-- Frontend: React 18 + Vite + TypeScript + Tailwind CSS
-- Backend: FastAPI (Python) + SQLite (add only when the sprint contract requires it)
-- Previous sprints' code already exists under project/
+- The tech stack MUST be taken from the "Technical Architecture" section of artifacts/spec.md and the existing code in project/.
+- Do NOT switch technologies (e.g., do not replace Java/Spring Boot with Python/FastAPI, or Ant Design with Tailwind CSS, unless the spec explicitly says so).
+- Respect the ACTUAL directory structure in project/ (e.g., `memclaw-frontend/`, `memclaw-web/`). Do NOT create new directories like `frontend/` or `backend/` unless they already exist.
+- Previous sprints' code already exists under project/.
 
 ## WORKFLOW
 1. Read artifacts/spec.md AND artifacts/sprint-__SPRINT_NUM__-contract-final.md — understand every acceptance criterion and the Design Language.
