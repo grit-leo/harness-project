@@ -78,12 +78,12 @@ restart_backend() {
     backend_type="python"
     backend_dir="${ROOT}/project/backend"
     [[ ! -d "$backend_dir" ]] && backend_dir="${ROOT}/project"
-  elif find "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
+  elif find -L "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
     backend_type="java-maven"
-    backend_dir="$(dirname "$(find "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit)")"
-  elif find "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
+    backend_dir="$(dirname "$(find -L "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit)")"
+  elif find -L "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
     backend_type="java-gradle"
-    backend_dir="$(dirname "$(find "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit)")"
+    backend_dir="$(dirname "$(find -L "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit)")"
   fi
 
   if [[ -z "$backend_type" ]]; then
@@ -146,7 +146,7 @@ restart_frontend() {
 
   # Find package.json recursively (up to 2 levels deep)
   local pkg_json
-  pkg_json="$(find "${ROOT}/project" -maxdepth 2 -name "package.json" -print -quit 2>/dev/null)"
+  pkg_json="$(find -L "${ROOT}/project" -maxdepth 2 -name "package.json" -print -quit 2>/dev/null)"
 
   if [[ -z "$pkg_json" ]]; then
     echo "  [restart] No frontend (package.json) found. Skipping."

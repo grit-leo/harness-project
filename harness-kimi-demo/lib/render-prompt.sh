@@ -128,7 +128,7 @@ detect_project_tech_stack() {
 
   # --- Frontend detection (search up to 2 levels deep) ---
   local pkg_json
-  pkg_json="$(find "$project_dir" -maxdepth 2 -name "package.json" -print -quit 2>/dev/null)"
+  pkg_json="$(find -L "$project_dir" -maxdepth 2 -name "package.json" -print -quit 2>/dev/null)"
   if [[ -n "$pkg_json" ]]; then
     local fw="Unknown"
     if grep -q '"react"' "$pkg_json" 2>/dev/null; then fw="React"; fi
@@ -138,39 +138,39 @@ detect_project_tech_stack() {
     if grep -q '"next"' "$pkg_json" 2>/dev/null; then fw="Next.js"; fi
     findings+=("Frontend: $fw (package.json found)")
 
-    if grep -q '"tailwindcss"' "$pkg_json" 2>/dev/null || find "$project_dir" -maxdepth 2 -name "tailwind.config.*" -print -quit 2>/dev/null | grep -q .; then
+    if grep -q '"tailwindcss"' "$pkg_json" 2>/dev/null || find -L "$project_dir" -maxdepth 2 -name "tailwind.config.*" -print -quit 2>/dev/null | grep -q .; then
       findings+=("  - Tailwind CSS detected")
     fi
-    if find "$project_dir" -maxdepth 2 -name "vite.config.*" -print -quit 2>/dev/null | grep -q .; then
+    if find -L "$project_dir" -maxdepth 2 -name "vite.config.*" -print -quit 2>/dev/null | grep -q .; then
       findings+=("  - Vite detected")
     fi
   fi
 
   # --- Backend detection ---
-  if find "$project_dir" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
     findings+=("Backend: Java (Maven / Spring Boot)")
   fi
-  if find "$project_dir" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
     findings+=("Backend: Java/Kotlin (Gradle / Spring Boot)")
   fi
-  if find "$project_dir" -maxdepth 2 -name "requirements.txt" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 2 -name "requirements.txt" -print -quit 2>/dev/null | grep -q .; then
     findings+=("Backend: Python (requirements.txt)")
   fi
-  if find "$project_dir" -maxdepth 2 -name "pyproject.toml" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 2 -name "pyproject.toml" -print -quit 2>/dev/null | grep -q .; then
     findings+=("Backend: Python (pyproject.toml)")
   fi
-  if find "$project_dir" -maxdepth 2 -name "go.mod" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 2 -name "go.mod" -print -quit 2>/dev/null | grep -q .; then
     findings+=("Backend: Go")
   fi
-  if find "$project_dir" -maxdepth 2 -name "Cargo.toml" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 2 -name "Cargo.toml" -print -quit 2>/dev/null | grep -q .; then
     findings+=("Backend: Rust")
   fi
 
   # --- Database / DevOps ---
-  if find "$project_dir" -maxdepth 3 -name "*.sql" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 3 -name "*.sql" -print -quit 2>/dev/null | grep -q .; then
     findings+=("Database: SQL schema files present")
   fi
-  if find "$project_dir" -maxdepth 1 -name "Dockerfile*" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 1 -name "Dockerfile*" -print -quit 2>/dev/null | grep -q .; then
     findings+=("DevOps: Dockerfile present")
   fi
 
@@ -186,9 +186,9 @@ detect_project_tech_stack() {
 
 # ── Detect build command for evaluator ──────────────────────────────
 detect_build_command() {
-  if find "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
     echo "cd project && mvn clean compile"
-  elif find "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
+  elif find -L "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
     echo "cd project && ./gradlew build"
   elif [[ -f "${ROOT}/project/package.json" ]]; then
     echo "cd project && npm run build"
@@ -210,7 +210,7 @@ detect_frontend_url() {
   fi
   # Fallback: infer from package.json scripts or vite config
   local pkg_json
-  pkg_json="$(find "${ROOT}/project" -maxdepth 2 -name "package.json" -print -quit 2>/dev/null)"
+  pkg_json="$(find -L "${ROOT}/project" -maxdepth 2 -name "package.json" -print -quit 2>/dev/null)"
   if [[ -f "$pkg_json" ]]; then
     local vite_cfg
     vite_cfg="$(find "$(dirname "$pkg_json")" -maxdepth 1 -name 'vite.config.*' -print -quit 2>/dev/null || echo "")"
