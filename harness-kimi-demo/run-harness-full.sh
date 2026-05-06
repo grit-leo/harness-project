@@ -232,15 +232,17 @@ run_kimi_no_browser() {
   KIMI_EXTRA_ARGS="$_saved_args"
 }
 
-# Handle --add-goal (queue a goal and exit)
+# Handle --add-goal (queue a goal and exit; auto-init on first run)
 if [[ -n "$ADD_GOAL" ]]; then
   if state_exists; then
     state_push_goal "$ADD_GOAL"
     echo "Goal added to queue: $ADD_GOAL"
     echo "Queue contents: $(state_get goal_queue)"
   else
-    echo "ERROR: No harness state found. Start a run first."
-    exit 1
+    echo "No harness state found. Auto-initializing with goal: $ADD_GOAL"
+    MAX_QA_ROUNDS="${MAX_QA_ROUNDS:-3}"
+    state_init "$ADD_GOAL" "$MAX_QA_ROUNDS"
+    echo "State initialized. Goal set: $ADD_GOAL"
   fi
   exit 0
 fi

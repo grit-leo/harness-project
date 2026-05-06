@@ -197,6 +197,35 @@ detect_build_command() {
   fi
 }
 
+# ── Detect actual frontend URL (from restart-servers.sh record or fallback) ──
+detect_frontend_url() {
+  local ports_file="${ROOT}/artifacts/harness-server-ports.json"
+  if [[ -f "$ports_file" ]]; then
+    local url
+    url="$(python3 -c "import json; print(json.load(open('${ports_file}')).get('frontend_url',''))" 2>/dev/null || echo "")"
+    if [[ -n "$url" ]]; then
+      echo "$url"
+      return
+    fi
+  fi
+  # Fallback: infer from package.json scripts or vite config
+  local pkg_json
+  pkg_json="$(find "${ROOT}/project" -maxdepth 2 -name "package.json" -print -quit 2>/dev/null)"
+  if [[ -f "$pkg_json" ]]; then
+    local vite_cfg
+    vite_cfg="$(find "$(dirname "$pkg_json")" -maxdepth 1 -name 'vite.config.*' -print -quit 2>/dev/null || echo "")"
+    if [[ -n "$vite_cfg" && -f "$vite_cfg" ]] && grep -qE 'port.*3000' "$vite_cfg" 2>/dev/null; then
+      echo "http://localhost:3000"
+      return
+    fi
+    if grep -qE '\-\-port.*3000|\-\-port 3000' "$pkg_json" 2>/dev/null; then
+      echo "http://localhost:3000"
+      return
+    fi
+  fi
+  echo "http://localhost:5173"
+}
+
 # ══════════════════════════════════════════════════════════════════════
 #  Prompt Renderers
 # ══════════════════════════════════════════════════════════════════════
@@ -298,13 +327,17 @@ render_evaluator_prompt() {
   local build_cmd
   build_cmd="$(detect_build_command)"
 
+  local frontend_url
+  frontend_url="$(detect_frontend_url)"
+
   render_prompt "${SCRIPT_DIR}/prompts/templates/evaluator.txt" \
     "__SPRINT_NUM__" "$sprint_num" \
     "__QA_ROUND__" "$qa_round" \
     "__PREV_QA_LINE__" "$prev_qa_line" \
     "__PREV_BUG_STATUS_SECTION__" "$prev_bug_section" \
     "__REGRESSION_CRITERIA__" "$regression_criteria" \
-    "__BUILD_CMD__" "$build_cmd"
+    "__BUILD_CMD__" "$build_cmd" \
+    "__FRONTEND_URL__" "$frontend_url"
 }
 
 # ── Reviewer prompt ─────────────────────────────────────────────────
@@ -314,9 +347,13 @@ render_reviewer_prompt() {
   local core_journeys
   core_journeys="$(source "${SCRIPT_DIR}/lib/quality-gate.sh" && generate_core_journeys)"
 
+  local frontend_url
+  frontend_url="$(detect_frontend_url)"
+
   render_prompt "${SCRIPT_DIR}/prompts/templates/reviewer.txt" \
     "__EPOCH__" "$epoch" \
-    "__CORE_JOURNEYS__" "$core_journeys"
+    "__CORE_JOURNEYS__" "$core_journeys" \
+    "__FRONTEND_URL__" "$frontend_url"
 }
 
 # ── Polish Contract prompt ──────────────────────────────────────────
