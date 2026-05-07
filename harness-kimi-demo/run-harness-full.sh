@@ -617,7 +617,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
       #  FAST VERIFY — Incremental check before full re-review
       # ════════════════════════════════════════════════════════════════
       FAST_VERIFY="artifacts/polish-${POLISH_ROUND}-verify.md"
-      local prev_epoch_for_verify=$(( CURRENT_EPOCH - 1 ))
+      prev_epoch_for_verify=$(( CURRENT_EPOCH - 1 ))
       if [[ "$prev_epoch_for_verify" -lt 1 ]]; then prev_epoch_for_verify=1; fi
 
       if [[ ! -f "$FAST_VERIFY" ]]; then
