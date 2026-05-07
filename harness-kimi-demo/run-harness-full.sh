@@ -531,7 +531,10 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
     sleep 5
 
     prompt="$(render_reviewer_prompt "$CURRENT_EPOCH")"
+    _saved_args="$KIMI_EXTRA_ARGS"
+    KIMI_EXTRA_ARGS="$KIMI_EXTRA_ARGS --max-steps-per-turn 100"
     run_kimi_with_browser "Product Reviewer Epoch ${CURRENT_EPOCH}" "$prompt" "$REVIEW_FILE"
+    KIMI_EXTRA_ARGS="$_saved_args"
 
     if [[ ! -f "$REVIEW_FILE" ]]; then
       echo "  WARNING: Product review not written after ${KIMI_MAX_RETRIES} attempts."
@@ -622,7 +625,10 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
 
         # Use reviewer but with updated epoch marker
         prompt="$(render_reviewer_prompt "${CURRENT_EPOCH}.${POLISH_ROUND}")"
+        _saved_args="$KIMI_EXTRA_ARGS"
+        KIMI_EXTRA_ARGS="$KIMI_EXTRA_ARGS --max-steps-per-turn 100"
         run_kimi_with_browser "Re-review after Polish ${POLISH_ROUND}" "$prompt" "$POLISH_REVIEW"
+        KIMI_EXTRA_ARGS="$_saved_args"
 
         # The reviewer might write to a different filename; check both
         if [[ ! -f "$POLISH_REVIEW" ]]; then
