@@ -613,7 +613,52 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
       # ── Git commit for polish ────────────────────────────
       (cd project && git add -A 2>/dev/null && git commit -q -m "Polish round ${POLISH_ROUND}: quality improvements" 2>/dev/null) || true
 
-      # ── Re-review after polish ───────────────────────────
+      # ════════════════════════════════════════════════════════════════
+      #  FAST VERIFY — Incremental check before full re-review
+      # ════════════════════════════════════════════════════════════════
+      FAST_VERIFY="artifacts/polish-${POLISH_ROUND}-verify.md"
+      local prev_epoch_for_verify=$(( CURRENT_EPOCH - 1 ))
+      if [[ "$prev_epoch_for_verify" -lt 1 ]]; then prev_epoch_for_verify=1; fi
+
+      if [[ ! -f "$FAST_VERIFY" ]]; then
+        log_phase "EPOCH ${CURRENT_EPOCH} — FAST VERIFY Polish ${POLISH_ROUND}" "Checking fix scope only..."
+        state_set phase "polish_fast"
+
+        restart_backend
+        restart_frontend
+        sleep 5
+
+        prompt="$(render_polish_verifier_prompt "$POLISH_ROUND" "$CURRENT_EPOCH" "$prev_epoch_for_verify")"
+        _saved_args="$KIMI_EXTRA_ARGS"
+        KIMI_EXTRA_ARGS="$_saved_args --max-steps-per-turn 40"
+        run_kimi_with_browser "Polish Fast Verify ${POLISH_ROUND}" "$prompt" "$FAST_VERIFY"
+        KIMI_EXTRA_ARGS="$_saved_args"
+      fi
+
+      # ── Check if fast verify passed ───────────────────────
+      if [[ -f "$FAST_VERIFY" ]] && grep -q "SHIP_IT: true" "$FAST_VERIFY"; then
+        NEW_SCORE="$(grep -oE 'Score: [0-9]+(\.[0-9]+)?' "$FAST_VERIFY" | grep -oE '[0-9]+(\.[0-9]+)?' || echo "0")"
+        echo ""
+        echo "  ✓ Polish ${POLISH_ROUND} passed FAST VERIFY (score: ${NEW_SCORE}/10)"
+        echo "  → Skipping full re-review, proceeding to next phase."
+
+        # Use fast verify score, bump previous epoch score for fixed items
+        PREV_SCORE="$QUALITY_SCORE"
+        state_record_quality "${CURRENT_EPOCH}.${POLISH_ROUND}" "$NEW_SCORE" || true
+        QUALITY_SCORE="$NEW_SCORE"
+
+        MEETS="$(quality_meets_threshold "$NEW_SCORE" "$QUALITY_THRESHOLD")"
+        if [[ "$MEETS" == "true" ]]; then
+          echo "  ✓ Quality threshold met after Polish ${POLISH_ROUND}!"
+          break
+        fi
+        # If fast verify passed but threshold not met, continue to next polish round
+        continue
+      fi
+
+      echo "  Fast verify failed or inconclusive. Running full re-review..."
+
+      # ── Re-review after polish (FULL — fallback) ───────────
       POLISH_REVIEW="artifacts/product-review-epoch-${CURRENT_EPOCH}-polish-${POLISH_ROUND}.md"
       if [[ ! -f "$POLISH_REVIEW" ]]; then
         log_phase "EPOCH ${CURRENT_EPOCH} — RE-REVIEW after Polish ${POLISH_ROUND}" "Checking improvements..."
@@ -626,7 +671,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
         # Use reviewer but with updated epoch marker
         prompt="$(render_reviewer_prompt "${CURRENT_EPOCH}.${POLISH_ROUND}")"
         _saved_args="$KIMI_EXTRA_ARGS"
-        KIMI_EXTRA_ARGS="$KIMI_EXTRA_ARGS --max-steps-per-turn 100"
+        KIMI_EXTRA_ARGS="$_saved_args --max-steps-per-turn 60"
         run_kimi_with_browser "Re-review after Polish ${POLISH_ROUND}" "$prompt" "$POLISH_REVIEW"
         KIMI_EXTRA_ARGS="$_saved_args"
 

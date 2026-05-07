@@ -381,3 +381,41 @@ render_polish_generator_prompt() {
     "__EPOCH__" "$epoch" \
     "__VISUAL_CONTEXT__" "$visual_ctx"
 }
+
+# ── Polish Verifier prompt (Fast Verify — incremental) ───────────────
+render_polish_verifier_prompt() {
+  local polish_num="$1"
+  local epoch="$2"
+  local prev_epoch="$3"
+
+  local prev_review="artifacts/product-review-epoch-${prev_epoch}.md"
+  local polish_contract="artifacts/polish-${polish_num}-contract-final.md"
+  local frontend_url
+  frontend_url="$(detect_frontend_url)"
+
+  # Extract pages from polish contract
+  local polish_pages=""
+  if [[ -f "${ROOT}/${polish_contract}" ]]; then
+    polish_pages="$(grep -oE '(AdminHome|TalentList|AgreementList|DisputeList|SettlementList|RuleList|ReconciliationList|CalculationList|DashboardLayout|TalentReconciliation)' "${ROOT}/${polish_contract}" | sort -u | tr '\n' ',' | sed 's/,$//')"
+  fi
+  if [[ -z "$polish_pages" ]]; then
+    polish_pages="(auto-detect from contract)"
+  fi
+
+  # Extract core journeys from previous review
+  local polish_journeys=""
+  if [[ -f "${ROOT}/${prev_review}" ]]; then
+    polish_journeys="$(grep -A 5 'Journey' "${ROOT}/${prev_review}" | grep -E '(登录|Dashboard|上传协议|异议|对账|计算)' | head -3 | sed 's/^/- /')"
+  fi
+
+  render_prompt "${SCRIPT_DIR}/prompts/templates/polish-verifier.txt" \
+    "__POLISH_NUM__" "$polish_num" \
+    "__EPOCH__" "$epoch" \
+    "__PREV_EPOCH__" "$prev_epoch" \
+    "__PREV_REVIEW_FILE__" "$prev_review" \
+    "__POLISH_CONTRACT__" "$polish_contract" \
+    "__POLISH_PAGES__" "$polish_pages" \
+    "__POLISH_JOURNEYS__" "$polish_journeys" \
+    "__VERIFY_OUTPUT__" "artifacts/polish-${polish_num}-verify.md" \
+    "__FRONTEND_URL__" "$frontend_url"
+}
