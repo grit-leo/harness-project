@@ -78,12 +78,12 @@ restart_backend() {
     backend_type="python"
     backend_dir="${ROOT}/project/backend"
     [[ ! -d "$backend_dir" ]] && backend_dir="${ROOT}/project"
-  elif find "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
+  elif find -L "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
     backend_type="java-maven"
-    backend_dir="$(dirname "$(find "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit)")"
-  elif find "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
+    backend_dir="$(dirname "$(find -L "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit)")"
+  elif find -L "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
     backend_type="java-gradle"
-    backend_dir="$(dirname "$(find "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit)")"
+    backend_dir="$(dirname "$(find -L "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit)")"
   fi
 
   if [[ -z "$backend_type" ]]; then
@@ -146,7 +146,7 @@ restart_frontend() {
 
   # Find package.json recursively (up to 2 levels deep)
   local pkg_json
-  pkg_json="$(find "${ROOT}/project" -maxdepth 2 -name "package.json" -print -quit 2>/dev/null)"
+  pkg_json="$(find -L "${ROOT}/project" -maxdepth 2 -name "package.json" -print -quit 2>/dev/null)"
 
   if [[ -z "$pkg_json" ]]; then
     echo "  [restart] No frontend (package.json) found. Skipping."
@@ -163,7 +163,25 @@ restart_frontend() {
   for port in 5173 3000 4200 8081; do
     lsof -ti :$port 2>/dev/null | xargs kill -9 2>/dev/null || true
   done
-  sleep 2
+  sleep 1
+
+  # CRITICAL: Kill foreign vite dev servers whose CWD is NOT our project_dir.
+  # This prevents other projects (e.g., MemClaw on port 3000) from resurrecting
+  # and hijacking the port after we start our dev server.
+  echo "  [restart] Purging foreign vite processes..."
+  local foreign_killed=0
+  while IFS= read -r pid; do
+    [[ -z "$pid" ]] && continue
+    local cwd
+    cwd=$(lsof -p "$pid" +r 0 2>/dev/null | awk '/cwd/{print $NF}' | head -1 || echo "")
+    if [[ -n "$cwd" && "$cwd" != "$project_dir"* ]]; then
+      kill -9 "$pid" 2>/dev/null && foreign_killed=$(( foreign_killed + 1 ))
+    fi
+  done < <(pgrep -f "node.*vite" 2>/dev/null || true)
+  if (( foreign_killed > 0 )); then
+    echo "  [restart] Killed $foreign_killed foreign vite process(es)."
+    sleep 1
+  fi
 
   echo "  [restart] Starting frontend dev server..."
   (
@@ -171,10 +189,23 @@ restart_frontend() {
     nohup npm run dev > "$log_file" 2>&1 &
   )
 
-  # Try common frontend ports
-  wait_for_url "http://localhost:5173/" "Frontend :5173" 5 || \
-  wait_for_url "http://localhost:3000/" "Frontend :3000" 5 || \
-  wait_for_url "http://localhost:8081/" "Frontend :8081" 3 || true
+  # Try common frontend ports and record the one that works
+  local frontend_url=""
+  if wait_for_url "http://localhost:5173/" "Frontend :5173" 5; then
+    frontend_url="http://localhost:5173"
+  elif wait_for_url "http://localhost:3000/" "Frontend :3000" 5; then
+    frontend_url="http://localhost:3000"
+  elif wait_for_url "http://localhost:8081/" "Frontend :8081" 3; then
+    frontend_url="http://localhost:8081"
+  fi
+
+  if [[ -n "$frontend_url" ]]; then
+    mkdir -p "${ROOT}/artifacts"
+    python3 -c "import json; json.dump({'frontend_url':'${frontend_url}'}, open('${ROOT}/artifacts/harness-server-ports.json','w'))"
+    echo "  [restart] Recorded frontend URL: $frontend_url"
+  else
+    echo "  [restart] WARNING: Could not detect a reachable frontend URL."
+  fi
 }
 
 # Ensure both backend and frontend are running with fresh code.

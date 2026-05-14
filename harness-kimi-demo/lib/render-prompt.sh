@@ -128,7 +128,7 @@ detect_project_tech_stack() {
 
   # --- Frontend detection (search up to 2 levels deep) ---
   local pkg_json
-  pkg_json="$(find "$project_dir" -maxdepth 2 -name "package.json" -print -quit 2>/dev/null)"
+  pkg_json="$(find -L "$project_dir" -maxdepth 2 -name "package.json" -print -quit 2>/dev/null)"
   if [[ -n "$pkg_json" ]]; then
     local fw="Unknown"
     if grep -q '"react"' "$pkg_json" 2>/dev/null; then fw="React"; fi
@@ -138,39 +138,39 @@ detect_project_tech_stack() {
     if grep -q '"next"' "$pkg_json" 2>/dev/null; then fw="Next.js"; fi
     findings+=("Frontend: $fw (package.json found)")
 
-    if grep -q '"tailwindcss"' "$pkg_json" 2>/dev/null || find "$project_dir" -maxdepth 2 -name "tailwind.config.*" -print -quit 2>/dev/null | grep -q .; then
+    if grep -q '"tailwindcss"' "$pkg_json" 2>/dev/null || find -L "$project_dir" -maxdepth 2 -name "tailwind.config.*" -print -quit 2>/dev/null | grep -q .; then
       findings+=("  - Tailwind CSS detected")
     fi
-    if find "$project_dir" -maxdepth 2 -name "vite.config.*" -print -quit 2>/dev/null | grep -q .; then
+    if find -L "$project_dir" -maxdepth 2 -name "vite.config.*" -print -quit 2>/dev/null | grep -q .; then
       findings+=("  - Vite detected")
     fi
   fi
 
   # --- Backend detection ---
-  if find "$project_dir" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
     findings+=("Backend: Java (Maven / Spring Boot)")
   fi
-  if find "$project_dir" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
     findings+=("Backend: Java/Kotlin (Gradle / Spring Boot)")
   fi
-  if find "$project_dir" -maxdepth 2 -name "requirements.txt" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 2 -name "requirements.txt" -print -quit 2>/dev/null | grep -q .; then
     findings+=("Backend: Python (requirements.txt)")
   fi
-  if find "$project_dir" -maxdepth 2 -name "pyproject.toml" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 2 -name "pyproject.toml" -print -quit 2>/dev/null | grep -q .; then
     findings+=("Backend: Python (pyproject.toml)")
   fi
-  if find "$project_dir" -maxdepth 2 -name "go.mod" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 2 -name "go.mod" -print -quit 2>/dev/null | grep -q .; then
     findings+=("Backend: Go")
   fi
-  if find "$project_dir" -maxdepth 2 -name "Cargo.toml" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 2 -name "Cargo.toml" -print -quit 2>/dev/null | grep -q .; then
     findings+=("Backend: Rust")
   fi
 
   # --- Database / DevOps ---
-  if find "$project_dir" -maxdepth 3 -name "*.sql" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 3 -name "*.sql" -print -quit 2>/dev/null | grep -q .; then
     findings+=("Database: SQL schema files present")
   fi
-  if find "$project_dir" -maxdepth 1 -name "Dockerfile*" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "$project_dir" -maxdepth 1 -name "Dockerfile*" -print -quit 2>/dev/null | grep -q .; then
     findings+=("DevOps: Dockerfile present")
   fi
 
@@ -186,15 +186,44 @@ detect_project_tech_stack() {
 
 # ── Detect build command for evaluator ──────────────────────────────
 detect_build_command() {
-  if find "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
+  if find -L "${ROOT}/project" -maxdepth 2 -name "pom.xml" -print -quit 2>/dev/null | grep -q .; then
     echo "cd project && mvn clean compile"
-  elif find "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
+  elif find -L "${ROOT}/project" -maxdepth 2 -name "build.gradle*" -print -quit 2>/dev/null | grep -q .; then
     echo "cd project && ./gradlew build"
   elif [[ -f "${ROOT}/project/package.json" ]]; then
     echo "cd project && npm run build"
   else
     echo "cd project && npm run build"
   fi
+}
+
+# ── Detect actual frontend URL (from restart-servers.sh record or fallback) ──
+detect_frontend_url() {
+  local ports_file="${ROOT}/artifacts/harness-server-ports.json"
+  if [[ -f "$ports_file" ]]; then
+    local url
+    url="$(python3 -c "import json; print(json.load(open('${ports_file}')).get('frontend_url',''))" 2>/dev/null || echo "")"
+    if [[ -n "$url" ]]; then
+      echo "$url"
+      return
+    fi
+  fi
+  # Fallback: infer from package.json scripts or vite config
+  local pkg_json
+  pkg_json="$(find -L "${ROOT}/project" -maxdepth 2 -name "package.json" -print -quit 2>/dev/null)"
+  if [[ -f "$pkg_json" ]]; then
+    local vite_cfg
+    vite_cfg="$(find "$(dirname "$pkg_json")" -maxdepth 1 -name 'vite.config.*' -print -quit 2>/dev/null || echo "")"
+    if [[ -n "$vite_cfg" && -f "$vite_cfg" ]] && grep -qE 'port.*3000' "$vite_cfg" 2>/dev/null; then
+      echo "http://localhost:3000"
+      return
+    fi
+    if grep -qE '\-\-port.*3000|\-\-port 3000' "$pkg_json" 2>/dev/null; then
+      echo "http://localhost:3000"
+      return
+    fi
+  fi
+  echo "http://localhost:5173"
 }
 
 # ══════════════════════════════════════════════════════════════════════
@@ -298,13 +327,17 @@ render_evaluator_prompt() {
   local build_cmd
   build_cmd="$(detect_build_command)"
 
+  local frontend_url
+  frontend_url="$(detect_frontend_url)"
+
   render_prompt "${SCRIPT_DIR}/prompts/templates/evaluator.txt" \
     "__SPRINT_NUM__" "$sprint_num" \
     "__QA_ROUND__" "$qa_round" \
     "__PREV_QA_LINE__" "$prev_qa_line" \
     "__PREV_BUG_STATUS_SECTION__" "$prev_bug_section" \
     "__REGRESSION_CRITERIA__" "$regression_criteria" \
-    "__BUILD_CMD__" "$build_cmd"
+    "__BUILD_CMD__" "$build_cmd" \
+    "__FRONTEND_URL__" "$frontend_url"
 }
 
 # ── Reviewer prompt ─────────────────────────────────────────────────
@@ -314,9 +347,13 @@ render_reviewer_prompt() {
   local core_journeys
   core_journeys="$(source "${SCRIPT_DIR}/lib/quality-gate.sh" && generate_core_journeys)"
 
+  local frontend_url
+  frontend_url="$(detect_frontend_url)"
+
   render_prompt "${SCRIPT_DIR}/prompts/templates/reviewer.txt" \
     "__EPOCH__" "$epoch" \
-    "__CORE_JOURNEYS__" "$core_journeys"
+    "__CORE_JOURNEYS__" "$core_journeys" \
+    "__FRONTEND_URL__" "$frontend_url"
 }
 
 # ── Polish Contract prompt ──────────────────────────────────────────
@@ -343,4 +380,42 @@ render_polish_generator_prompt() {
     "__POLISH_NUM__" "$polish_num" \
     "__EPOCH__" "$epoch" \
     "__VISUAL_CONTEXT__" "$visual_ctx"
+}
+
+# ── Polish Verifier prompt (Fast Verify — incremental) ───────────────
+render_polish_verifier_prompt() {
+  local polish_num="$1"
+  local epoch="$2"
+  local prev_epoch="$3"
+
+  local prev_review="artifacts/product-review-epoch-${prev_epoch}.md"
+  local polish_contract="artifacts/polish-${polish_num}-contract-final.md"
+  local frontend_url
+  frontend_url="$(detect_frontend_url)"
+
+  # Extract pages from polish contract
+  local polish_pages=""
+  if [[ -f "${ROOT}/${polish_contract}" ]]; then
+    polish_pages="$(grep -oE '(AdminHome|TalentList|AgreementList|DisputeList|SettlementList|RuleList|ReconciliationList|CalculationList|DashboardLayout|TalentReconciliation)' "${ROOT}/${polish_contract}" | sort -u | tr '\n' ',' | sed 's/,$//')"
+  fi
+  if [[ -z "$polish_pages" ]]; then
+    polish_pages="(auto-detect from contract)"
+  fi
+
+  # Extract core journeys from previous review
+  local polish_journeys=""
+  if [[ -f "${ROOT}/${prev_review}" ]]; then
+    polish_journeys="$(grep -A 5 'Journey' "${ROOT}/${prev_review}" | grep -E '(登录|Dashboard|上传协议|异议|对账|计算)' | head -3 | sed 's/^/- /')"
+  fi
+
+  render_prompt "${SCRIPT_DIR}/prompts/templates/polish-verifier.txt" \
+    "__POLISH_NUM__" "$polish_num" \
+    "__EPOCH__" "$epoch" \
+    "__PREV_EPOCH__" "$prev_epoch" \
+    "__PREV_REVIEW_FILE__" "$prev_review" \
+    "__POLISH_CONTRACT__" "$polish_contract" \
+    "__POLISH_PAGES__" "$polish_pages" \
+    "__POLISH_JOURNEYS__" "$polish_journeys" \
+    "__VERIFY_OUTPUT__" "artifacts/polish-${polish_num}-verify.md" \
+    "__FRONTEND_URL__" "$frontend_url"
 }
