@@ -14,7 +14,7 @@
 
 | 变量含义 | 路径 | 用途 |
 |----------|------|------|
-| `SCRIPT_DIR` | 本脚本所在目录（即 `harness-kimi-demo/`） | 读取 [`prompts/templates/`](prompts/templates)、[`config/playwright-mcp-isolated.json`](config/playwright-mcp-isolated.json)；**始终不变**，与外仓无关。 |
+| `SCRIPT_DIR` | 本脚本所在目录（即 `harness-kimi/`） | 读取 [`prompts/templates/`](prompts/templates)、[`config/playwright-mcp-isolated.json`](config/playwright-mcp-isolated.json)；**始终不变**，与外仓无关。 |
 | `WORK_ROOT` / `ROOT` | 未指定外仓时为 `SCRIPT_DIR`；外仓时为 `$REPO/.harness` | Kimi `-w`、当前目录、`artifacts/`、`project`（代码树）所在根。 |
 
 评测阶段传给 Kimi 的 MCP 配置路径为 **`${SCRIPT_DIR}/config/playwright-mcp-isolated.json`**，确保 Playwright 设置来自 harness 包，而非业务仓库。
@@ -80,7 +80,7 @@ export HARNESS_PROJECT_ROOT=/绝对路径/你的git仓库
 
 ## 仅在本 demo 内运行（与旧版一致）
 
-不传 `--project` / `HARNESS_PROJECT_ROOT` 时，工作区即本 `harness-kimi-demo` 目录：
+不传 `--project` / `HARNESS_PROJECT_ROOT` 时，工作区即本 `harness-kimi` 目录：
 
 ```bash
 ./run-harness-full.sh "Build a …"

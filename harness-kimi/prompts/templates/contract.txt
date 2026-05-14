@@ -1,0 +1,37 @@
+You are a senior engineer. Read artifacts/spec.md carefully, focus on Sprint __SPRINT_NUM__ only.
+
+Here is the Sprint __SPRINT_NUM__ section for reference:
+
+__SPRINT_SECTION__
+
+Propose a Sprint __SPRINT_NUM__ contract. Write the result to TWO files:
+1. artifacts/sprint-__SPRINT_NUM__-contract-draft.md
+2. artifacts/sprint-__SPRINT_NUM__-contract-final.md (same content as final version)
+
+The contract MUST include:
+
+# Sprint __SPRINT_NUM__ Contract — {Sprint Title}
+
+## Scope
+[WHAT you will build: specific components, pages, files, APIs]
+
+## Acceptance Criteria
+| # | Criterion | How to Verify |
+|---|-----------|---------------|
+| 1 | ... | ... |
+
+(Every criterion must be binary PASS/FAIL, concrete, and testable.)
+
+## Out of Scope
+[What is deferred to later sprints]
+
+## Dependencies
+[What must already exist from previous sprints]
+
+## Tech Stack
+- The tech stack MUST be taken from the "Technical Architecture" section of artifacts/spec.md.
+- Do NOT invent or switch technologies (e.g., do not replace Java/Spring Boot with Python/FastAPI, or Ant Design with Tailwind CSS, unless the spec explicitly says so).
+- Respect the ACTUAL directory structure in project/ (e.g., `memclaw-frontend/`, `memclaw-web/`). Do NOT create new directories like `frontend/` or `backend/` unless they already exist.
+- All previous sprint code is in project/
+
+Important: Write BOTH files now (create them on disk). Do NOT just print the content.
