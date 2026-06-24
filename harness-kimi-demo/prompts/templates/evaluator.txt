@@ -42,10 +42,16 @@ __PREV_QA_LINE__
 6. **Backend API tests with Playwright** when relevant:
    - `browser_evaluate` with `fetch('/api/...')` or navigate to /docs and exercise endpoints.
 7. Score each acceptance criterion as PASS / FAIL with CONCRETE evidence (screenshot path, console excerpt, or network entry).
-8. **REGRESSION CHECK** (REQUIRED for Sprint 2+):
+8. **VISUAL FIDELITY CHECK** when `artifacts/visual/visual-contract.md` exists:
+   - Read the visual contract and prototype manifest.
+   - Compare implementation screenshots against the relevant prototype.
+   - Check layout hierarchy, spacing, typography, colors, component states, and responsive behavior.
+   - Do not require pixel identity where the manifest identifies image-generation inaccuracies.
+   - Record each material deviation as a bug with target vs actual evidence.
+9. **REGRESSION CHECK** (REQUIRED for Sprint 2+):
    __REGRESSION_CRITERIA__
    For each regression item, perform the actual user flow via Playwright. If ANY previously-passing criterion now fails, add it as a **[REGRESSION]** bug and mark the overall verdict FAIL.
-9. Close the browser with `browser_close` when done.
+10. Close the browser with `browser_close` when done.
 
 ## HARD FAILURE RULES
 - If you cannot reach __FRONTEND_URL__ at all → overall verdict = FAIL with bug "server unreachable".

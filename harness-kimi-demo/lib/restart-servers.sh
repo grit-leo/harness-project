@@ -3,7 +3,7 @@
 
 # Kill any leftover Playwright / Chromium processes from a previous MCP session.
 # This prevents CDP port conflicts and user-data-dir locks that cause deadlocks
-# when the next Kimi + Playwright MCP session starts.
+# when the next agent + Playwright MCP session starts.
 kill_playwright() {
   local killed=0 pids_to_kill=()
 

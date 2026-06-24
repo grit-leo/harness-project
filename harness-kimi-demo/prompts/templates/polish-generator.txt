@@ -59,20 +59,19 @@ Before fixing ANY P0, you MUST follow this protocol:
 
 ## MANDATORY CONTEXT FILES (READ BEFORE FIXING)
 
-Before touching any code, read these files to understand the system:
-- `project/firestore.rules` — Firestore security rules
-- `project/firebase-blueprint.json` — Data model and collections
-- `project/package.json` — Dependencies and scripts
-- `project/vite.config.ts` — Build config
-- Console errors from the review (check the review file for specific error messages)
+Before touching code:
+- Inspect the repository and read the actual dependency, build, route, data-model, and configuration files relevant to each issue.
+- Read `artifacts/visual/visual-contract.md` when it exists.
+- Read console and network errors from the review.
+- Do not assume Firebase, Vite, React, Python, or any other stack unless those files are present.
 
 ## WORKFLOW
 1. Read the polish contract to understand all items.
 2. Read the product review for detailed evidence on each issue.
 3. Fix items one by one, verifying each works before moving to the next.
-4. Run `cd project && npm run build` to verify no regressions.
+4. Run the repository's actual build and test commands to verify no regressions.
 5. If you changed Python files, restart the backend.
-6. Commit: `cd project && git add -A && git commit -m "Polish __POLISH_NUM__: [summary of fixes]"`
+6. Do not commit changes. The Harness owns Git checkpoints.
 7. Write handoff to artifacts/polish-__POLISH_NUM__-handoff.md:
 
 # Polish Sprint __POLISH_NUM__ Handoff

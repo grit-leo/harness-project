@@ -1,4 +1,5 @@
 You are a senior engineer. Read artifacts/spec.md carefully, focus on Sprint __SPRINT_NUM__ only.
+When present, also read artifacts/visual/visual-contract.md and artifacts/visual/prototype-manifest.md. Translate relevant visual requirements into binary acceptance criteria for this sprint.
 
 Here is the Sprint __SPRINT_NUM__ section for reference:
 

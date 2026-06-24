@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════
-#  run-harness-full.sh — Multi-Epoch Evolution Harness for Kimi CLI
+#  run-harness-full.sh — Multi-Epoch Evolution Harness for Codex or Kimi CLI
 #
 #  Architecture:
 #    Epoch 1 (build):   Planner → Sprint 1..N → QA loops
@@ -26,7 +26,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# ── Resolve WORK_ROOT (Kimi -w + cwd): demo tree or repo/.harness ──
+# ── Resolve WORK_ROOT: demo tree or repo/.harness ────────────────
 RESUME=false
 USER_GOAL=""
 ADD_GOAL=""
@@ -81,7 +81,7 @@ export ROOT WORK_ROOT SCRIPT_DIR LEGACY_PROJECT
 # ── Log setup ────────────────────────────────────────────────────
 LOG_DIR="/tmp/harness-logs"
 mkdir -p "$LOG_DIR"
-# Generator Fix uses this to disable MCP (see QA loop). Must exist or Kimi may behave inconsistently.
+# Kimi fallback uses this to disable MCP for non-browser stages.
 printf '%s\n' '{"mcpServers":{}}' > /tmp/empty-mcp.json
 
 # ── Graceful interrupt ───────────────────────────────────────────
@@ -104,133 +104,19 @@ source "${SCRIPT_DIR}/lib/check-verdict.sh"
 source "${SCRIPT_DIR}/lib/render-prompt.sh"
 source "${SCRIPT_DIR}/lib/restart-servers.sh"
 source "${SCRIPT_DIR}/lib/quality-gate.sh"
+source "${SCRIPT_DIR}/lib/verify.sh"
+source "${SCRIPT_DIR}/lib/agent.sh"
 
 # ── Configuration (override via env) ─────────────────────────────
 USER_MAX_QA="${MAX_QA_ROUNDS:-}"
 MAX_QA_ROUNDS="${MAX_QA_ROUNDS:-3}"
 START_FROM_SPRINT="${START_FROM_SPRINT:-1}"
-KIMI_EXTRA_ARGS="${KIMI_EXTRA_ARGS:-}"
 STRICT_MODE="${STRICT_MODE:-false}"
 QUALITY_THRESHOLD="${QUALITY_THRESHOLD:-7.0}"
 MAX_POLISH_ROUNDS="${MAX_POLISH_ROUNDS:-3}"
 MAX_EPOCHS="${MAX_EPOCHS:-10}"
+ENABLE_VISUAL_PROTOTYPE="${ENABLE_VISUAL_PROTOTYPE:-true}"
 HARNESS_START_TIME="$(date +%s)"
-
-# ── Helper: run kimi with timing + auto-retry ─────────────────────
-# Usage: run_kimi "Label" "$prompt" [expected_artifact]
-# If expected_artifact is given, success is judged by whether the file exists
-# after kimi returns (Kimi CLI may exit 0 even on Connection error).
-KIMI_MAX_RETRIES="${KIMI_MAX_RETRIES:-3}"
-KIMI_RETRY_DELAY="${KIMI_RETRY_DELAY:-10}"
-
-run_kimi() {
-  local label="$1"
-  local prompt="$2"
-  local expected_file="${3:-}"
-  local t_start t_end elapsed attempt=0 exit_code ok
-
-  t_start="$(date +%s)"
-
-  while (( attempt < KIMI_MAX_RETRIES )); do
-    attempt=$(( attempt + 1 ))
-    if (( attempt > 1 )); then
-      echo "  [kimi] ${label} — retry ${attempt}/${KIMI_MAX_RETRIES} after ${KIMI_RETRY_DELAY}s cooldown..."
-      sleep "$KIMI_RETRY_DELAY"
-    fi
-
-    echo "  [kimi] ${label} — started at $(date +%H:%M:%S)"
-
-    set +e
-    kimi --print -w "$ROOT" $KIMI_EXTRA_ARGS -p "$prompt"
-    exit_code=$?
-    set -e
-
-    ok=true
-    if (( exit_code != 0 )); then
-      ok=false
-    fi
-    if [[ -n "$expected_file" && ! -f "$expected_file" ]]; then
-      ok=false
-    fi
-
-    if $ok; then
-      break
-    fi
-
-    echo "  [kimi] ${label} — attempt ${attempt} failed (exit=${exit_code}, artifact=$(
-      [[ -n "$expected_file" ]] && { [[ -f "$expected_file" ]] && echo "exists" || echo "MISSING"; } || echo "n/a"
-    ))"
-  done
-
-  t_end="$(date +%s)"
-  elapsed=$(( t_end - t_start ))
-  echo "  [kimi] ${label} — done in $(( elapsed / 60 ))m $(( elapsed % 60 ))s"
-}
-
-# Agents that need Playwright MCP (Evaluator, Reviewer).
-# Kills leftover browsers before EACH attempt to prevent CDP / lock conflicts.
-# Uses config/playwright-mcp-isolated.json so Playwright runs with --isolated
-# (avoids "Browser is already in use for ... mcp-chrome-*" when another MCP
-# or a stale Chromium still holds the shared profile).
-run_kimi_with_browser() {
-  local label="$1"
-  local prompt="$2"
-  local expected_file="${3:-}"
-  local t_start t_end elapsed attempt=0 exit_code ok
-  local _saved_browser_args="$KIMI_EXTRA_ARGS"
-
-  KIMI_EXTRA_ARGS="$_saved_browser_args --mcp-config-file ${SCRIPT_DIR}/config/playwright-mcp-isolated.json"
-
-  t_start="$(date +%s)"
-
-  while (( attempt < KIMI_MAX_RETRIES )); do
-    attempt=$(( attempt + 1 ))
-    if (( attempt > 1 )); then
-      echo "  [kimi] ${label} — retry ${attempt}/${KIMI_MAX_RETRIES} after ${KIMI_RETRY_DELAY}s cooldown..."
-      sleep "$KIMI_RETRY_DELAY"
-    fi
-
-    kill_playwright
-
-    echo "  [kimi] ${label} — started at $(date +%H:%M:%S)"
-
-    set +e
-    kimi --print -w "$ROOT" $KIMI_EXTRA_ARGS -p "$prompt"
-    exit_code=$?
-    set -e
-
-    ok=true
-    if (( exit_code != 0 )); then
-      ok=false
-    fi
-    if [[ -n "$expected_file" && ! -f "$expected_file" ]]; then
-      ok=false
-    fi
-
-    if $ok; then
-      break
-    fi
-
-    echo "  [kimi] ${label} — attempt ${attempt} failed (exit=${exit_code}, artifact=$(
-      [[ -n "$expected_file" ]] && { [[ -f "$expected_file" ]] && echo "exists" || echo "MISSING"; } || echo "n/a"
-    ))"
-  done
-
-  t_end="$(date +%s)"
-  elapsed=$(( t_end - t_start ))
-  echo "  [kimi] ${label} — done in $(( elapsed / 60 ))m $(( elapsed % 60 ))s"
-
-  KIMI_EXTRA_ARGS="$_saved_browser_args"
-}
-
-# Agents that do NOT need the browser (Planner, Generator, Contract, Polish, Evolution).
-# Disables MCP entirely so Kimi won't start Playwright.
-run_kimi_no_browser() {
-  local _saved_args="$KIMI_EXTRA_ARGS"
-  KIMI_EXTRA_ARGS="$KIMI_EXTRA_ARGS --mcp-config-file /tmp/empty-mcp.json"
-  run_kimi "$@"
-  KIMI_EXTRA_ARGS="$_saved_args"
-}
 
 # Handle --add-goal (queue a goal and exit; auto-init on first run)
 if [[ -n "$ADD_GOAL" ]]; then
@@ -246,6 +132,8 @@ if [[ -n "$ADD_GOAL" ]]; then
   fi
   exit 0
 fi
+
+agent_preflight || exit 1
 
 # ══════════════════════════════════════════════════════════════════
 #  INIT / RESUME
@@ -263,7 +151,7 @@ if $RESUME && state_exists; then
 
   local_phase="$(state_get phase)"
   case "$local_phase" in
-    planning|planning_done|building|qa|qa_fix|sprint_contract)
+    planning|planning_done|visual_brief|visual_prototype|visual_contract|building|qa|qa_fix|sprint_contract)
       START_FROM_SPRINT="$(state_get current_sprint)"
       [[ "$START_FROM_SPRINT" == "0" ]] && START_FROM_SPRINT=1
       ;;
@@ -308,6 +196,8 @@ else
   echo "  Quality threshold: $QUALITY_THRESHOLD / 10"
   echo "  Max polish rounds: $MAX_POLISH_ROUNDS"
   echo "  Strict mode:       $STRICT_MODE"
+  echo "  Agent provider:    $AGENT_PROVIDER"
+  echo "  Visual prototype:  $ENABLE_VISUAL_PROTOTYPE"
   echo "  State file:        artifacts/harness-state.json"
   if [[ -n "${LEGACY_PROJECT:-}" ]]; then
     echo "  Target repo:       $LEGACY_PROJECT"
@@ -333,7 +223,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
     state_set epoch_type "build"
 
     prompt="$(render_planner_prompt "$USER_GOAL")"
-    run_kimi_no_browser "Planner" "$prompt" "artifacts/spec.md"
+    run_agent_no_browser "Planner" "$prompt" "artifacts/spec.md"
 
     if [[ ! -f artifacts/spec.md ]]; then
       echo "ERROR: Planner did not create artifacts/spec.md" >&2
@@ -343,6 +233,36 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
     state_set phase "planning_done"
   else
     echo "  [SKIP] artifacts/spec.md already exists ($(wc -l < artifacts/spec.md | tr -d ' ') lines)."
+  fi
+
+  # ── Visual prototype pipeline ───────────────────────────────────
+  if [[ "$ENABLE_VISUAL_PROTOTYPE" == "true" ]]; then
+    if [[ ! -f artifacts/visual/visual-brief.md ]]; then
+      log_phase "EPOCH ${CURRENT_EPOCH} — VISUAL BRIEF" "Defining target screens and visual direction..."
+      state_set phase "visual_brief"
+      prompt="$(render_visual_brief_prompt)"
+      run_agent_no_browser "Visual Brief" "$prompt" "artifacts/visual/visual-brief.md"
+    fi
+
+    if [[ ! -f artifacts/visual/prototype-manifest.md ]]; then
+      log_phase "EPOCH ${CURRENT_EPOCH} — IMAGE2 PROTOTYPES" "Generating high-fidelity visual targets..."
+      state_set phase "visual_prototype"
+      prompt="$(render_visual_prototype_prompt)"
+      run_agent_no_browser "Image2 Visual Prototypes" "$prompt" "artifacts/visual/prototype-manifest.md"
+    fi
+
+    if [[ ! -f artifacts/visual/visual-contract.md ]]; then
+      log_phase "EPOCH ${CURRENT_EPOCH} — VISUAL CONTRACT" "Translating prototypes into implementation rules..."
+      state_set phase "visual_contract"
+      prompt="$(render_visual_contract_prompt)"
+      run_agent_no_browser "Visual Contract" "$prompt" "artifacts/visual/visual-contract.md"
+    fi
+
+    if [[ ! -f artifacts/visual/visual-contract.md ]]; then
+      echo "ERROR: Visual contract was not created." >&2
+      state_set phase "visual_contract_failed" || true
+      exit 1
+    fi
   fi
 
   # ── Parse sprint count ─────────────────────────────────────────
@@ -389,11 +309,11 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
 
         sprint_section="$(extract_sprint_section "$sprint")"
         prompt="$(render_contract_prompt "$sprint" "$sprint_section")"
-        run_kimi_no_browser "Contract Sprint ${sprint}" "$prompt" "$CONTRACT_FILE"
+        run_agent_no_browser "Contract Sprint ${sprint}" "$prompt" "$CONTRACT_FILE"
 
         if [[ ! -f "$CONTRACT_FILE" ]]; then
           echo "  WARNING: Contract file not created. Retrying once..."
-          run_kimi_no_browser "Contract Sprint ${sprint} (retry)" "$prompt" "$CONTRACT_FILE"
+          run_agent_no_browser "Contract Sprint ${sprint} (retry)" "$prompt" "$CONTRACT_FILE"
         fi
         if [[ ! -f "$CONTRACT_FILE" ]]; then
           echo "  WARNING: Contract still not created. Using draft if available."
@@ -417,7 +337,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
         state_set phase "building"
 
         prompt="$(render_generator_prompt "$sprint")"
-        run_kimi_no_browser "Generator Sprint ${sprint}" "$prompt"
+        run_agent_no_browser "Generator Sprint ${sprint}" "$prompt"
       else
         echo "  [SKIP] Sprint ${sprint} generator already ran (handoff or QA exists)."
       fi
@@ -439,17 +359,18 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
           continue
         fi
 
-        restart_backend
-        restart_frontend
-
         log_phase "SPRINT ${sprint} — QA ROUND ${qa_round}/${EFFECTIVE_MAX_QA}" "Evaluating..."
         state_set phase "qa"
 
-        prompt="$(render_evaluator_prompt "$sprint" "$qa_round")"
-        _saved_args="$KIMI_EXTRA_ARGS"
-        KIMI_EXTRA_ARGS="$KIMI_EXTRA_ARGS --max-steps-per-turn 100"
-        run_kimi_with_browser "Evaluator Sprint ${sprint} R${qa_round}" "$prompt" "$QA_REPORT"
-        KIMI_EXTRA_ARGS="$_saved_args"
+        if run_deterministic_checks "$sprint" "$qa_round"; then
+          restart_backend
+          restart_frontend
+          prompt="$(render_evaluator_prompt "$sprint" "$qa_round")"
+          run_agent_with_browser "Evaluator Sprint ${sprint} R${qa_round}" "$prompt" "$QA_REPORT"
+        else
+          echo "  Deterministic checks failed; browser verification skipped."
+          write_check_failure_report "$sprint" "$qa_round"
+        fi
 
         if [[ ! -f "$QA_REPORT" ]]; then
           echo "  WARNING: QA report not written. Treating as FAIL."
@@ -479,7 +400,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
             state_set phase "qa_fix"
 
             prompt="$(render_generator_fix_prompt "$sprint" "$qa_round")"
-            run_kimi_no_browser "Generator Fix Sprint ${sprint} R${qa_round}" "$prompt"
+            run_agent_no_browser "Generator Fix Sprint ${sprint} R${qa_round}" "$prompt"
 
             rm -f "$HANDOFF_FILE"
           fi
@@ -531,13 +452,10 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
     sleep 5
 
     prompt="$(render_reviewer_prompt "$CURRENT_EPOCH")"
-    _saved_args="$KIMI_EXTRA_ARGS"
-    KIMI_EXTRA_ARGS="$KIMI_EXTRA_ARGS --max-steps-per-turn 100"
-    run_kimi_with_browser "Product Reviewer Epoch ${CURRENT_EPOCH}" "$prompt" "$REVIEW_FILE"
-    KIMI_EXTRA_ARGS="$_saved_args"
+    run_agent_with_browser "Product Reviewer Epoch ${CURRENT_EPOCH}" "$prompt" "$REVIEW_FILE"
 
     if [[ ! -f "$REVIEW_FILE" ]]; then
-      echo "  WARNING: Product review not written after ${KIMI_MAX_RETRIES} attempts."
+      echo "  WARNING: Product review not written after ${AGENT_MAX_RETRIES} attempts."
       if [[ -n "${LEGACY_PROJECT:-}" ]]; then
         echo "  Resume later with: $0 --project $(printf '%q' "$LEGACY_PROJECT") --resume"
       else
@@ -593,7 +511,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
         state_set phase "polishing"
 
         prompt="$(render_polish_contract_prompt "$POLISH_ROUND" "$CURRENT_EPOCH" 5)"
-        run_kimi_no_browser "Polish Contract ${POLISH_ROUND}" "$prompt" "$POLISH_CONTRACT"
+        run_agent_no_browser "Polish Contract ${POLISH_ROUND}" "$prompt" "$POLISH_CONTRACT"
 
         if [[ ! -f "$POLISH_CONTRACT" ]]; then
           echo "  WARNING: Polish contract not created. Skipping this polish round."
@@ -607,7 +525,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
         state_set phase "polish_build"
 
         prompt="$(render_polish_generator_prompt "$POLISH_ROUND" "$CURRENT_EPOCH")"
-        run_kimi_no_browser "Polish Generator ${POLISH_ROUND}" "$prompt"
+        run_agent_no_browser "Polish Generator ${POLISH_ROUND}" "$prompt"
       fi
 
       # ── Git commit for polish ────────────────────────────
@@ -629,10 +547,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
         sleep 5
 
         prompt="$(render_polish_verifier_prompt "$POLISH_ROUND" "$CURRENT_EPOCH" "$prev_epoch_for_verify")"
-        _saved_args="$KIMI_EXTRA_ARGS"
-        KIMI_EXTRA_ARGS="$_saved_args --max-steps-per-turn 40"
-        run_kimi_with_browser "Polish Fast Verify ${POLISH_ROUND}" "$prompt" "$FAST_VERIFY"
-        KIMI_EXTRA_ARGS="$_saved_args"
+        run_agent_with_browser "Polish Fast Verify ${POLISH_ROUND}" "$prompt" "$FAST_VERIFY"
       fi
 
       # ── Check if fast verify passed ───────────────────────
@@ -670,10 +585,7 @@ while (( CURRENT_EPOCH <= MAX_EPOCHS )); do
 
         # Use reviewer but with updated epoch marker
         prompt="$(render_reviewer_prompt "${CURRENT_EPOCH}.${POLISH_ROUND}")"
-        _saved_args="$KIMI_EXTRA_ARGS"
-        KIMI_EXTRA_ARGS="$_saved_args --max-steps-per-turn 60"
-        run_kimi_with_browser "Re-review after Polish ${POLISH_ROUND}" "$prompt" "$POLISH_REVIEW"
-        KIMI_EXTRA_ARGS="$_saved_args"
+        run_agent_with_browser "Re-review after Polish ${POLISH_ROUND}" "$prompt" "$POLISH_REVIEW"
 
         # The reviewer might write to a different filename; check both
         if [[ ! -f "$POLISH_REVIEW" ]]; then
@@ -734,7 +646,7 @@ Read the current spec and the existing code under project/. Then:
 
 IMPORTANT: Actually modify artifacts/spec.md. Do NOT just describe the changes."
 
-    run_kimi_no_browser "Evolution Planner: ${NEXT_GOAL}" "$EVOLUTION_PROMPT"
+    run_agent_no_browser "Evolution Planner: ${NEXT_GOAL}" "$EVOLUTION_PROMPT"
 
     # Re-parse sprint count and continue the build loop
     TOTAL_SPRINTS="$(parse_sprint_count)"

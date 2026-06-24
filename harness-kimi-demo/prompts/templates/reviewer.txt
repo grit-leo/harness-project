@@ -33,6 +33,8 @@ Your job is NOT to check acceptance criteria (that was already done). Your job i
 - Backend API: http://localhost:8080 (OpenAPI at /docs)
 - Both servers are already running. Do NOT try to start them.
 - Product Spec: artifacts/spec.md
+- Visual Contract: artifacts/visual/visual-contract.md (when present)
+- Prototype Manifest: artifacts/visual/prototype-manifest.md (when present)
 - Playwright MCP tools available: `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_fill_form`, `browser_type`, `browser_take_screenshot`, `browser_evaluate`, `browser_console_messages`, `browser_network_requests`, `browser_wait_for`, `browser_tabs`, `browser_close`.
 
 ## CRITICAL — PROJECT IDENTITY CHECK
@@ -51,6 +53,7 @@ Before executing ANY UI tests, after `browser_navigate` to __FRONTEND_URL__, you
    c. Check responsive behavior: resize to 375px (mobile), 768px (tablet), 1440px (desktop)
    d. `browser_console_messages` — note any errors or warnings
    e. `browser_network_requests` — note any failed API calls
+4. When a visual contract exists, compare key screenshots against the relevant prototypes. Record material hierarchy, spacing, typography, color, component-state, and responsive deviations. Respect inaccuracies documented in the prototype manifest.
 
 ### Phase 2: Core User Journey Testing
 Test these end-to-end flows as a real user would:

@@ -1,0 +1,25 @@
+Use the installed `imagegen` skill and its default built-in gpt-image-2 path.
+
+Read:
+- `artifacts/spec.md`
+- `artifacts/visual/visual-brief.md`
+- the existing UI source under `project/`
+
+Generate polished high-fidelity UI mockups for the primary screens listed in the visual brief.
+
+Requirements:
+
+1. Use case: `ui-mockup`.
+2. Generate at least one desktop mockup and one mobile mockup.
+3. Preserve exact product copy from the visual brief where practical.
+4. Keep layouts implementable with the repository's existing frontend stack.
+5. Avoid device frames, perspective distortion, watermarks, and decorative marketing backgrounds.
+6. Save final selected PNG files under `artifacts/visual/prototypes/`.
+7. Create `artifacts/visual/prototype-manifest.md` listing:
+   - generated filename
+   - screen/state
+   - viewport intent
+   - source prompt
+   - any text or layout inaccuracies the Generator must not copy
+
+If image generation is unavailable, do not create placeholder or fake images. Create the manifest with `Status: unavailable`, include the exact failure, and stop.

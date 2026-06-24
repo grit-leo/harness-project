@@ -14,7 +14,7 @@ __READ_PRIOR_ROUNDS_LINE__
 3. Address ALL failed acceptance criteria.
 4. After fixing, run the build command to verify success.
 5. Restart the backend if you changed Python files: `cd project/backend && pkill -f 'uvicorn.*main:app' || true; sleep 2; source .venv/bin/activate && nohup python -m uvicorn main:app --host 127.0.0.1 --port 8000 > /tmp/harness-logs/backend.log 2>&1 &`
-6. Commit fixes to git: `cd project && git add -A && git commit -m "Sprint __SPRINT_NUM__ fix: address QA round __QA_ROUND__ feedback"`.
+6. Do not commit changes. The Harness owns Git checkpoints.
 7. Update artifacts/sprint-__SPRINT_NUM__-handoff.md with the fixes applied (include a bug-by-bug checklist).
 
 ## PRINCIPLES

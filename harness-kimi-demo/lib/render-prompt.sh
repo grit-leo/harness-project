@@ -22,25 +22,40 @@ render_prompt() {
 # ── Visual Context: collect screenshot paths for Generator ──────────
 collect_visual_context() {
   local screenshot_dir="${ROOT}/artifacts/screenshots"
-  if [[ ! -d "$screenshot_dir" ]]; then
+  local prototype_dir="${ROOT}/artifacts/visual/prototypes"
+  local result=""
+
+  if [[ -f "${ROOT}/artifacts/visual/visual-contract.md" ]]; then
+    result="## VISUAL SOURCE OF TRUTH\nRead and follow artifacts/visual/visual-contract.md.\n"
+  fi
+
+  if [[ -d "$prototype_dir" ]]; then
+    local prototypes
+    prototypes="$(find "$prototype_dir" -maxdepth 1 -type f -name '*.png' -print | sort | head -10)"
+    if [[ -n "$prototypes" ]]; then
+      result="${result}\n## TARGET PROTOTYPES\nImplement these as the intended visual target. Correct any known image inaccuracies listed in the prototype manifest:\n"
+      while IFS= read -r img; do
+        result="${result}\n- artifacts/visual/prototypes/$(basename "$img")"
+      done <<< "$prototypes"
+    fi
+  fi
+
+  if [[ -d "$screenshot_dir" ]]; then
+    local screenshots
+    screenshots="$(ls -t "$screenshot_dir"/*.png 2>/dev/null | head -10)"
+    if [[ -n "$screenshots" ]]; then
+      result="${result}\n\n## CURRENT APP STATE\nThese screenshots show the current implementation baseline:\n"
+      while IFS= read -r img; do
+        result="${result}\n- artifacts/screenshots/$(basename "$img")"
+      done <<< "$screenshots"
+    fi
+  fi
+
+  if [[ -z "$result" ]]; then
     echo ""
     return
   fi
-
-  local screenshots
-  screenshots="$(ls -t "$screenshot_dir"/*.png 2>/dev/null | head -10)"
-  if [[ -z "$screenshots" ]]; then
-    echo ""
-    return
-  fi
-
-  local result="## CURRENT APP STATE (screenshots from prior QA/review)\nThese show what the app looks like RIGHT NOW. Use them to understand the visual baseline:\n"
-  while IFS= read -r img; do
-    local fname
-    fname="$(basename "$img")"
-    result="${result}\n- artifacts/screenshots/${fname}"
-  done <<< "$screenshots"
-  result="${result}\n\nReview these screenshots before making changes so you maintain visual consistency."
+  result="${result}\n\nUse the visual contract for exact implementation rules; use prototypes for composition and hierarchy."
   echo -e "$result"
 }
 
@@ -245,6 +260,18 @@ render_planner_prompt() {
   render_prompt "${SCRIPT_DIR}/prompts/templates/planner.txt" \
     "__USER_GOAL__" "$user_goal" \
     "__EXISTING_TECH_STACK__" "$tech_stack_info"
+}
+
+render_visual_brief_prompt() {
+  cat "${SCRIPT_DIR}/prompts/templates/visual-brief.txt"
+}
+
+render_visual_prototype_prompt() {
+  cat "${SCRIPT_DIR}/prompts/templates/visual-prototype.txt"
+}
+
+render_visual_contract_prompt() {
+  cat "${SCRIPT_DIR}/prompts/templates/visual-contract.txt"
 }
 
 render_contract_prompt() {

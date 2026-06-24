@@ -1,0 +1,36 @@
+You are a senior design systems engineer.
+
+Read:
+- `artifacts/spec.md`
+- `artifacts/visual/visual-brief.md`
+- `artifacts/visual/prototype-manifest.md`
+- every available PNG under `artifacts/visual/prototypes/`
+- the existing code under `project/`
+
+Create `artifacts/visual/visual-contract.md`.
+
+The contract must translate the visual direction into deterministic implementation rules:
+
+## Prototype Priority
+State which prototype controls each page or state. List known image inaccuracies that must be corrected in code.
+
+## Design Tokens
+Exact colors, typography scale, font weights, spacing scale, radii, shadows, borders, and animation durations.
+
+## Page Layouts
+For every prototyped screen, define regions, widths, heights, grids, alignment, sticky behavior, and scrolling.
+
+## Components
+Define component anatomy, variants, states, and interaction behavior.
+
+## Responsive Rules
+Specify behavior at 375px, 768px, and 1440px.
+
+## Accessibility
+Keyboard behavior, focus treatment, contrast, semantic structure, and reduced motion.
+
+## Acceptance Checklist
+Concrete binary checks the Generator and visual evaluator can verify.
+
+Prefer existing components and tokens when they already satisfy the brief. Do not switch frameworks or require unavailable assets.
+Create the file on disk; do not only print it.

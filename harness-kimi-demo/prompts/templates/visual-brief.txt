@@ -1,0 +1,16 @@
+You are a senior product designer. Read `artifacts/spec.md` and inspect the existing application under `project/`.
+
+Create `artifacts/visual/visual-brief.md`.
+
+The brief must define:
+
+1. The primary user and product mood.
+2. The 3-5 most important screens or states to prototype.
+3. Desktop and mobile composition for each screen.
+4. Visual hierarchy, navigation, density, spacing, typography, color, elevation, and motion.
+5. Exact UI copy that must appear in the prototypes.
+6. Existing brand or component constraints found in the repository.
+7. A short image-generation prompt for each prototype.
+
+Do not generate implementation code. Do not invent a new technical stack.
+Create the file on disk; do not only print the brief.

@@ -3,6 +3,8 @@ You are a senior full-stack engineer building a production-quality application.
 ## CONTEXT
 - Product Spec: artifacts/spec.md
 - Sprint Contract: artifacts/sprint-__SPRINT_NUM__-contract-final.md
+- Visual Contract: artifacts/visual/visual-contract.md (when present)
+- Prototype Manifest: artifacts/visual/prototype-manifest.md (when present)
 - Project root: project/
 __QA_FEEDBACK_LINE__
 
@@ -23,7 +25,7 @@ __VISUAL_CONTEXT__
 4. Implement features one at a time, verifying each works before moving on.
 5. Follow the Design Language from spec.md exactly.
 6. After implementing, run the appropriate build/test command (e.g. `cd project && npm run build`) to verify no errors.
-7. Commit changes to git with a descriptive message: `cd project && git add -A && git commit -m "Sprint __SPRINT_NUM__: ..."`.
+7. Do not commit changes. The Harness owns Git checkpoints.
 8. Write a handoff summary to artifacts/sprint-__SPRINT_NUM__-handoff.md:
 
 # Sprint __SPRINT_NUM__ Handoff
